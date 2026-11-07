@@ -33,7 +33,7 @@ export function viewToets() {
       <article class="card">
         <h2>Uitvoering</h2>
         <p>${esc(TOETS.uitvoering)}</p>
-        <div class="pairs-demo" aria-label="De zes duo's in een viertal">
+        <div class="pairs-demo">
           ${pairs.map(p => `<span>${p}</span>`).join('')}
         </div>
         <h3>De uitvoering bevat</h3>
@@ -230,23 +230,23 @@ function techRow(t) {
   return `
   <li class="tech ${open ? 'open' : ''}">
     <div class="tech-top">
-      <button type="button" class="tech-main" data-action="tech-open" data-id="${t.id}" aria-expanded="${open}">
+      <button type="button" class="tech-main" data-action="tech-open" data-id="${esc(t.id)}" aria-expanded="${open}">
         <span class="tech-name">${esc(t.name)}${note ? icon('note', 'has-note') : ''}</span>
         <span class="tech-meta">${techMeta(t)}</span>
       </button>
       ${t.video ? `<button type="button" class="icon-btn" data-action="video" data-url="${esc(t.video)}" data-title="${esc(t.name)}" aria-label="Video van ${esc(t.name)}">${icon('play')}</button>` : '<span class="icon-btn ghost" aria-hidden="true"></span>'}
-      <button type="button" class="icon-btn star ${fav ? 'on' : ''}" data-action="fav" data-id="${t.id}" aria-pressed="${fav}" aria-label="${fav ? 'Niet meer bewaren' : 'Bewaren'}">${icon('star')}</button>
+      <button type="button" class="icon-btn star ${fav ? 'on' : ''}" data-action="fav" data-id="${esc(t.id)}" aria-pressed="${fav}" aria-label="${fav ? 'Niet meer bewaren' : 'Bewaren'}">${icon('star')}</button>
     </div>
     ${open ? `
     <div class="tech-more">
       <label class="field"><span>Mijn aantekening</span>
-        <textarea rows="2" placeholder="Bijvoorbeeld: let op je grip, eerst op de knieën oefenen" data-input="tech-note" data-id="${t.id}">${esc(note)}</textarea>
+        <textarea rows="2" placeholder="Bijvoorbeeld: let op je grip, eerst op de knieën oefenen" data-input="tech-note" data-id="${esc(t.id)}">${esc(note)}</textarea>
       </label>
       <div class="row">
-        <button type="button" class="btn btn-primary" data-action="tech-to-choreo" data-id="${t.id}">${icon('plus')} In mijn show</button>
+        <button type="button" class="btn btn-primary" data-action="tech-to-choreo" data-id="${esc(t.id)}">${icon('plus')} In mijn show</button>
         ${t.custom ? `
-          <button type="button" class="btn btn-ghost" data-action="custom-edit" data-id="${t.id}">${icon('edit')} Wijzig</button>
-          <button type="button" class="btn btn-ghost danger" data-action="custom-delete" data-id="${t.id}">${icon('trash')} Verwijder</button>` : ''}
+          <button type="button" class="btn btn-ghost" data-action="custom-edit" data-id="${esc(t.id)}">${icon('edit')} Wijzig</button>
+          <button type="button" class="btn btn-ghost danger" data-action="custom-delete" data-id="${esc(t.id)}">${icon('trash')} Verwijder</button>` : ''}
       </div>
     </div>` : ''}
   </li>`;
@@ -264,12 +264,12 @@ function pickList(list, scene) {
     return `
     <li class="tech">
       <div class="tech-top">
-        <button type="button" class="tech-main" data-action="pick" data-id="${t.id}" data-scene="${esc(scene)}">
+        <button type="button" class="tech-main" data-action="pick" data-id="${esc(t.id)}" data-scene="${esc(scene)}">
           <span class="tech-name">${fav ? icon('star', 'fav-mark') : ''}${esc(t.name)}</span>
           <span class="tech-meta">${techMeta(t)}</span>
         </button>
         ${t.video ? `<button type="button" class="icon-btn" data-action="video" data-url="${esc(t.video)}" data-title="${esc(t.name)}" aria-label="Video van ${esc(t.name)}">${icon('play')}</button>` : ''}
-        <button type="button" class="icon-btn add ${n ? 'on' : ''}" data-action="pick" data-id="${t.id}" data-scene="${esc(scene)}" aria-label="Voeg ${esc(t.name)} toe">${n ? `${icon('check')}<b>${n}</b>` : icon('plus')}</button>
+        <button type="button" class="icon-btn add ${n ? 'on' : ''}" data-action="pick" data-id="${esc(t.id)}" data-scene="${esc(scene)}" aria-label="Voeg ${esc(t.name)} toe${n ? `, al ${n} keer gekozen` : ''}">${n ? `${icon('check')}<b>${n}</b>` : icon('plus')}</button>
       </div>
     </li>`;
   }).join('')}</ul>`;
@@ -304,6 +304,9 @@ function customForm(t) {
     </label>
     <fieldset class="field"><legend>Valrichting</legend><div class="seg">${radios('dir', DIRECTIONS, t.dir)}</div></fieldset>
     <fieldset class="field"><legend>Niveau</legend><div class="seg">${radios('level', LEVELS, t.level)}</div></fieldset>
+    <fieldset class="field" data-height ${t.level === 'uitdagend' ? '' : 'hidden'}><legend>Valhoogte <i>(voor de toetscheck)</i></legend>
+      <div class="seg">${radios('height', [{ id: 'laag', name: 'Laag' }, { id: 'hoog', name: 'Hoog' }], t.height === 'laag' ? 'laag' : 'hoog')}</div>
+    </fieldset>
     <label class="field"><span>YouTube-link <i>(optioneel)</i></span><input name="video" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${esc(t.video)}"></label>
   </form>`;
 }
@@ -317,6 +320,10 @@ function openCustomDialog(existing) {
              <button type="button" class="btn btn-primary" data-save>Opslaan</button>`,
   });
   const form = d.querySelector('form');
+  // Valhoogte alleen vragen bij uitdagende technieken
+  form.addEventListener('change', () => {
+    form.querySelector('[data-height]').hidden = form.elements.level.value !== 'uitdagend';
+  });
   const submit = () => {
     if (!form.reportValidity()) return;
     const data = Object.fromEntries(new FormData(form));

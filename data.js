@@ -117,10 +117,20 @@ const T = [
   ['t49', 'Fireman’s carry', 'wrestling', 'zijwaarts', 'uitdagend', 'https://youtu.be/vHONX2Q3xAE'],
 ];
 
-export const TECHNIQUES = T.map(([id, name, sport, dir, level, video]) => ({ id, name, sport, dir, level, video }));
+// Valhoogte van de uitdagende technieken, voor de toetscheck (laag of hoog vallen en werpen).
+// Laag en hoog volgen gewoon het niveau.
+const UITDAGEND_HOOGTE = {
+  t16: 'laag', t17: 'laag', t18: 'laag', t19: 'laag', t38: 'laag',
+  t20: 'hoog', t21: 'hoog', t36: 'hoog', t37: 'hoog', t39: 'hoog', t40: 'hoog', t48: 'hoog', t49: 'hoog',
+};
+
+export const TECHNIQUES = T.map(([id, name, sport, dir, level, video]) => ({
+  id, name, sport, dir, level, video,
+  height: level === 'uitdagend' ? UITDAGEND_HOOGTE[id] || 'hoog' : level,
+}));
 
 export const TECHNIEKEN = {
-  intro: 'Samen met je docent oefen je elke les de technieken van een ander sportprofiel: judo, BJJ, wrestling, WWE/catch wrestling, aikido en jiu-jitsu. Aikido en jiu-jitsu delen één week. Hier vind je al die technieken en meer. Zoek, filter, bewaar en zet ze direct in je choreo. Je kunt ook zelf technieken met een YouTube-link toevoegen.',
+  intro: 'Samen met je docent oefen je elke les de technieken van een ander sportprofiel: judo, BJJ, wrestling, WWE/catch wrestling, aikido en jiu-jitsu. Aikido en jiu-jitsu delen één week. Hier vind je al die technieken en meer. Zoek, filter, bewaar en zet ze direct in Mijn show. Je kunt ook zelf technieken met een YouTube-link toevoegen.',
   safety: 'Oefen je een nieuwe techniek? Vraag je docent om hulp bij veilig vallen en bij de opbouw van de techniek.',
 };
 
@@ -173,7 +183,7 @@ export const VALBREKEN = {
     { title: 'Toepassen en integreren', text: 'Toepassing en integratie in spel- en lessituaties, in dynamische, creatieve en didactisch verantwoorde vormen.', tag: 'Show opbouwen' },
     { title: 'De show', text: 'Oefenen en uitvoeren van de show/demonstratie (evaluatie).', tag: 'Toets' },
   ],
-  tip: 'Zet na elke sportles meteen de technieken die je wilt gebruiken in je choreo. Dan staat je show in week 6 al grotendeels en kun je die week besteden aan doorlopen, tempo en regie.',
+  tip: 'Zet na elke sportles meteen de technieken die je wilt gebruiken in Mijn show. Dan staat je show in week 6 al grotendeels en kun je die week besteden aan doorlopen, tempo en regie.',
   safety: [
     'Houd je kin op de borst als je valt.',
     'Sla actief af met arm en handpalm om de klap te verdelen.',

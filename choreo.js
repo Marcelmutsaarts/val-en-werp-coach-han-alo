@@ -1,8 +1,8 @@
 // Mijn show: viertal, zes duo's, technieken met rollen, toetscheck, uitvalcheck, oefenmodus en delen.
 import { SPORTS } from './data.js';
 import {
-  state, update, save, PAIRS, uid, newShow, activeShow, memberName, techById, sportById, levelById, dirById,
-  packShow, importPacked, encodeShare,
+  state, update, save, rerender, PAIRS, uid, newShow, activeShow, memberName, techById, sportById, levelById, dirById,
+  packShow, importPacked, encodeShare, decodeShare, shareCodeFrom,
 } from './store.js';
 import {
   esc, icon, actions, inputs, parts, refreshParts, openDialog, confirmDialog, promptDialog, openVideo, toast, download, slug,
@@ -35,7 +35,7 @@ export function analyze(show, absent = null) {
   const roles = [0, 1, 2, 3].filter(m => m !== absent).map(m => {
     const r = { valLaag: false, valHoog: false, werpLaag: false, werpHoog: false };
     for (const { t, sc, it } of used) {
-      const hoog = t.level !== 'laag';
+      const hoog = (t.height || t.level) === 'hoog';
       if (sc.pair[it.thrower] === m) r[hoog ? 'werpHoog' : 'werpLaag'] = true;
       if (sc.pair[1 - it.thrower] === m) r[hoog ? 'valHoog' : 'valLaag'] = true;
     }
@@ -53,8 +53,9 @@ export function analyze(show, absent = null) {
   };
 }
 
-const mark = ok => `<span class="mk ${ok ? 'ok' : ''}" aria-label="${ok ? 'in orde' : 'nog niet'}">${ok ? icon('check') : ''}</span>`;
+const mark = ok => `<span class="mk ${ok ? 'ok' : ''}">${ok ? icon('check') : ''}<span class="sr">${ok ? 'in orde' : 'nog niet'}</span></span>`;
 const frac = ([a, b]) => `<b class="frac ${a === b ? 'done' : ''}">${a}/${b}</b>`;
+const ROLE_WORDS = { valLaag: 'laag vallen', valHoog: 'hoog vallen', werpLaag: 'laag werpen', werpHoog: 'hoog werpen' };
 
 function checksBody(show) {
   const a = analyze(show);
@@ -65,8 +66,12 @@ function checksBody(show) {
     const b = analyze(show, ui.absent);
     const missing = b.sports.filter(x => !x.ok).map(x => x.s.name);
     const left = show.scenes.length - b.dropped.length;
-    uitval = `<p class="uitval-result">Zonder <b>${esc(memberName(show, ui.absent))}</b> vallen ${b.dropped.length} scènes weg en blijven er ${left} over.
-      ${missing.length ? `Dan ontbreekt nog: <b>${esc(missing.join(', '))}</b>.` : 'Alle sportprofielen zitten er dan nog in.'}</p>`;
+    const gaps = b.roles.map(x => ({ m: x.m, miss: Object.keys(ROLE_WORDS).filter(k => !x.r[k]) })).filter(x => x.miss.length);
+    uitval = `<div class="uitval-result">
+      <p>Zonder <b>${esc(memberName(show, ui.absent))}</b> vallen ${b.dropped.length} scènes weg en blijven er ${left} over.
+      ${missing.length ? `Dan ontbreekt: <b>${esc(missing.join(', '))}</b>.` : 'Alle sportprofielen zitten er dan nog in.'}</p>
+      ${gaps.length ? `<ul>${gaps.map(x => `<li><b>${esc(memberName(show, x.m))}</b> laat dan niet meer zien: ${x.miss.map(k => ROLE_WORDS[k]).join(', ')}</li>`).join('')}</ul>` : '<p>Iedereen laat dan nog steeds laag en hoog vallen en werpen zien.</p>'}
+    </div>`;
   }
   return `
     ${all ? `<p class="all-good">${icon('check')} Alles in orde. Tijd om te oefenen!</p>` : ''}
@@ -76,7 +81,7 @@ function checksBody(show) {
     </section>
     <section class="check-group">
       <h3>Alle sportprofielen ${frac(a.totals.sports)}</h3>
-      <ul class="sport-marks">${a.sports.map(x => `<li class="${x.ok ? 'ok' : ''}">${x.ok ? icon('check') : ''}${esc(x.s.name)}</li>`).join('')}</ul>
+      <ul class="sport-marks">${a.sports.map(x => `<li class="${x.ok ? 'ok' : ''}">${x.ok ? icon('check') : ''}${esc(x.s.name)}<span class="sr">${x.ok ? ', zit erin' : ', ontbreekt nog'}</span></li>`).join('')}</ul>
     </section>
     <section class="check-group">
       <h3>Ieder laat alles zien ${frac(a.totals.roles)}</h3>
@@ -84,7 +89,7 @@ function checksBody(show) {
         <thead><tr><th></th>${roleCols.map(([, l]) => `<th scope="col">${l}</th>`).join('')}</tr></thead>
         <tbody>${a.roles.map(x => `<tr><th scope="row">${who(show, x.m)}</th>${roleCols.map(([k]) => `<td>${mark(x.r[k])}</td>`).join('')}</tr>`).join('')}</tbody>
       </table>
-      <p class="hint">Hoog telt ook voor technieken op niveau uitdagend.</p>
+      <p class="hint">Bij uitdagende technieken telt de valhoogte van die techniek: een suplex is hoog, een roll of sweep vanaf de grond laag.</p>
     </section>
     <section class="check-group">
       <h3>Showelementen ${frac(a.totals.elements)}</h3>
@@ -137,7 +142,7 @@ function emptyView() {
       <button type="button" class="btn btn-primary" data-action="show-new">${icon('plus')} Nieuwe show</button>
       <button type="button" class="btn" data-action="show-import">${icon('upload')} Show importeren</button>
     </div>
-    <p class="muted">Kreeg je een link van een groepsgenoot? Open die link, dan verschijnt de show vanzelf hier.</p>
+    <p class="muted">Kreeg je een link van een groepsgenoot? Open de link, of kopieer hem en kies Show importeren › Link plakken. Dat laatste werkt ook als je de app vanaf je beginscherm gebruikt.</p>
   </section>`;
 }
 
@@ -197,28 +202,43 @@ function itemRow(show, sc, it, j) {
       <span class="tech-meta">${techMeta(t)}</span>
       <div class="roles">
         <span class="role"><small>werpt</small>${who(show, thr)}</span>
-        <button type="button" class="icon-btn sm" data-action="item-swap" data-scene="${sc.id}" data-item="${it.id}" aria-label="Wissel wie werpt en wie valt">${icon('swap')}</button>
+        <button type="button" class="icon-btn sm" data-action="item-swap" data-scene="${esc(sc.id)}" data-item="${esc(it.id)}" aria-label="Wissel wie werpt en wie valt">${icon('swap')}</button>
         <span class="role"><small>valt</small>${who(show, fal)}</span>
       </div>
-      <input type="text" class="item-note" maxlength="500" placeholder="Aanwijzing, bijvoorbeeld: op de drumroffel" value="${esc(it.note)}" data-input="item-note" data-scene="${sc.id}" data-item="${it.id}" aria-label="Aanwijzing bij ${esc(t.name)}">
+      <input type="text" class="item-note" maxlength="500" placeholder="Aanwijzing, bijvoorbeeld: op de drumroffel" value="${esc(it.note)}" data-input="item-note" data-scene="${esc(sc.id)}" data-item="${esc(it.id)}" aria-label="Aanwijzing bij ${esc(t.name)}">
     </div>
     <div class="item-tools">
-      <button type="button" class="icon-btn sm" data-action="item-move" data-dir="-1" data-scene="${sc.id}" data-item="${it.id}" aria-label="Omhoog" ${j === 0 ? 'disabled' : ''}>${icon('up')}</button>
-      <button type="button" class="icon-btn sm" data-action="item-move" data-dir="1" data-scene="${sc.id}" data-item="${it.id}" aria-label="Omlaag" ${j === sc.items.length - 1 ? 'disabled' : ''}>${icon('down')}</button>
-      <button type="button" class="icon-btn sm" data-action="item-remove" data-scene="${sc.id}" data-item="${it.id}" aria-label="Verwijder ${esc(t.name)}">${icon('x')}</button>
+      <button type="button" class="icon-btn sm" data-action="item-move" data-dir="-1" data-scene="${esc(sc.id)}" data-item="${esc(it.id)}" aria-label="Omhoog" ${j === 0 ? 'disabled' : ''}>${icon('up')}</button>
+      <button type="button" class="icon-btn sm" data-action="item-move" data-dir="1" data-scene="${esc(sc.id)}" data-item="${esc(it.id)}" aria-label="Omlaag" ${j === sc.items.length - 1 ? 'disabled' : ''}>${icon('down')}</button>
+      <button type="button" class="icon-btn sm" data-action="item-remove" data-scene="${esc(sc.id)}" data-item="${esc(it.id)}" aria-label="Verwijder ${esc(t.name)}">${icon('x')}</button>
     </div>
   </li>`;
 }
 
-function sceneCard(show, sc, i) {
+// Unieke technieken per duo, over alle scènes van dat duo samen (zoals de toetscheck telt)
+function duoTotals(show) {
+  const map = {};
+  for (const sc of show.scenes) {
+    if (!sc.pair) continue;
+    const k = pairKey(sc.pair);
+    map[k] = map[k] || { techs: new Set(), scenes: 0 };
+    map[k].scenes++;
+    sc.items.forEach(it => { if (techById(it.tech)) map[k].techs.add(it.tech); });
+  }
+  return map;
+}
+
+function sceneCard(show, sc, i, duos) {
   const items = sc.items.filter(it => techById(it.tech));
-  const distinct = new Set(items.map(it => it.tech)).size;
+  const duo = sc.pair ? duos[pairKey(sc.pair)] : null;
+  const distinct = duo ? duo.techs.size : 0;
+  const prefix = duo && duo.scenes > 1 ? 'duo: ' : '';
   const status = !sc.pair ? '' : distinct >= 2
-    ? `<span class="status ok">${icon('check')} ${distinct} technieken</span>`
-    : `<span class="status">nog ${2 - distinct} ${2 - distinct === 1 ? 'techniek' : 'technieken'}</span>`;
+    ? `<span class="status ok">${icon('check')} ${prefix}${distinct} technieken</span>`
+    : `<span class="status">${prefix}nog ${2 - distinct} ${2 - distinct === 1 ? 'techniek' : 'technieken'}</span>`;
   const last = show.scenes.length - 1;
   return `
-  <li class="scene ${isOut(sc) ? 'out' : ''} ${sc.pair ? '' : 'group'}" id="scene-${sc.id}">
+  <li class="scene ${isOut(sc) ? 'out' : ''} ${sc.pair ? '' : 'group'}" id="scene-${esc(sc.id)}">
     <header class="scene-head">
       <span class="scene-num">${i + 1}</span>
       <div class="scene-who">
@@ -226,16 +246,16 @@ function sceneCard(show, sc, i) {
         ${isOut(sc) ? '<span class="tag tag-accent">valt weg</span>' : status}
       </div>
       <div class="scene-tools">
-        <button type="button" class="icon-btn sm" data-action="scene-move" data-dir="-1" data-scene="${sc.id}" aria-label="Scène omhoog" ${i === 0 ? 'disabled' : ''}>${icon('up')}</button>
-        <button type="button" class="icon-btn sm" data-action="scene-move" data-dir="1" data-scene="${sc.id}" aria-label="Scène omlaag" ${i === last ? 'disabled' : ''}>${icon('down')}</button>
-        <button type="button" class="icon-btn sm" data-action="scene-remove" data-scene="${sc.id}" aria-label="Verwijder scène">${icon('trash')}</button>
+        <button type="button" class="icon-btn sm" data-action="scene-move" data-dir="-1" data-scene="${esc(sc.id)}" aria-label="Scène omhoog" ${i === 0 ? 'disabled' : ''}>${icon('up')}</button>
+        <button type="button" class="icon-btn sm" data-action="scene-move" data-dir="1" data-scene="${esc(sc.id)}" aria-label="Scène omlaag" ${i === last ? 'disabled' : ''}>${icon('down')}</button>
+        <button type="button" class="icon-btn sm" data-action="scene-remove" data-scene="${esc(sc.id)}" aria-label="Verwijder scène">${icon('trash')}</button>
       </div>
     </header>
-    <input type="text" class="scene-title" maxlength="120" placeholder="${sc.pair ? 'Moment in het verhaal (optioneel)' : 'Bijvoorbeeld: opening of slot'}" value="${esc(sc.title)}" data-input="scene-title" data-scene="${sc.id}" aria-label="Titel van scène ${i + 1}">
+    <input type="text" class="scene-title" maxlength="120" placeholder="${sc.pair ? 'Moment in het verhaal (optioneel)' : 'Bijvoorbeeld: opening of slot'}" value="${esc(sc.title)}" data-input="scene-title" data-scene="${esc(sc.id)}" aria-label="Titel van scène ${i + 1}">
     ${sc.pair ? `
       ${items.length ? `<ol class="items">${items.map((it, j) => itemRow(show, { ...sc, items }, it, j)).join('')}</ol>` : ''}
-      <button type="button" class="btn btn-ghost btn-add" data-action="pick-open" data-scene="${sc.id}">${icon('plus')} Techniek kiezen</button>` : ''}
-    <textarea class="scene-note" rows="1" maxlength="2000" placeholder="${sc.pair ? 'Regie: opkomst, overgang, muziekmoment' : 'Wat gebeurt er? Wie staat waar?'}" data-input="scene-note" data-scene="${sc.id}" aria-label="Regie bij scène ${i + 1}">${esc(sc.note)}</textarea>
+      <button type="button" class="btn btn-ghost btn-add" data-action="pick-open" data-scene="${esc(sc.id)}">${icon('plus')} Techniek kiezen</button>` : ''}
+    <textarea class="scene-note" rows="1" maxlength="2000" placeholder="${sc.pair ? 'Regie: opkomst, overgang, muziekmoment' : 'Wat gebeurt er? Wie staat waar?'}" data-input="scene-note" data-scene="${esc(sc.id)}" aria-label="Regie bij scène ${i + 1}">${esc(sc.note)}</textarea>
   </li>`;
 }
 
@@ -246,7 +266,7 @@ export function viewChoreo() {
   if (ui.absent != null && ui.absent > 3) ui.absent = null;
   const switcher = state.shows.length > 1
     ? `<label class="show-switch"><span class="sr">Kies een show</span>
-        <select data-input="show-switch">${state.shows.map(s => `<option value="${s.id}" ${s.id === show.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
+        <select data-input="show-switch">${state.shows.map(s => `<option value="${esc(s.id)}" ${s.id === show.id ? 'selected' : ''}>${esc(s.name)} · ${new Date(s.updated).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</option>`).join('')}</select>
       </label>` : '';
   return `
   <section class="page choreo">
@@ -269,7 +289,7 @@ export function viewChoreo() {
         ${ui.absent != null ? `
           <p class="absent-banner">${icon('users')}<span>Uitvalcheck: zo ziet de show eruit zonder <b>${esc(memberName(show, ui.absent))}</b>.</span>
             <button type="button" class="btn btn-sm" data-action="absent" data-i="">Stop</button></p>` : ''}
-        <ol class="scenes">${show.scenes.map((sc, i) => sceneCard(show, sc, i)).join('')}</ol>
+        <ol class="scenes">${(duos => show.scenes.map((sc, i) => sceneCard(show, sc, i, duos)).join(''))(duoTotals(show))}</ol>
         <button type="button" class="btn btn-ghost btn-block btn-dashed" data-action="scene-add">${icon('plus')} Scène toevoegen</button>
       </div>
       <aside class="choreo-side" aria-label="Toetscheck">
@@ -295,7 +315,7 @@ function openPicker(show, sc) {
         ${searchBox('pick')}
         <div data-part="filters" data-scope="pick">${parts.filters({ scope: 'pick' })}</div>
       </div>
-      <div data-part="techlist" data-scope="pick" data-scene="${sc.id}">${parts.techlist({ scope: 'pick', scene: sc.id })}</div>`,
+      <div data-part="techlist" data-scope="pick" data-scene="${esc(sc.id)}">${parts.techlist({ scope: 'pick', scene: sc.id })}</div>`,
     footer: '<button type="button" class="btn btn-primary btn-block" data-dlg-close>Klaar</button>',
   });
 }
@@ -337,17 +357,18 @@ function openRehearsal(show) {
   const elapsed = () => Math.floor(((pausedAt || Date.now()) - started - paused) / 1000);
   const clock = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
+  // De kaart noemt het duo en het moment; het scènenummer staat bovenin (één nummering)
   const stepCard = st => {
     if (!st.it) {
-      return `<p class="rh-scene">Scène ${st.si + 1} · ${esc(pairText(show, st.sc.pair))}</p>
+      return `<p class="rh-scene">${esc(pairText(show, st.sc.pair))}</p>
         <h2 class="rh-tech">${esc(st.sc.title || (st.sc.pair ? 'Nog geen technieken' : 'Groepsmoment'))}</h2>
-        ${st.sc.note ? `<p class="rh-note">${esc(st.sc.note)}</p>` : ''}`;
+        ${st.sc.note ? `<p class="rh-regie">${esc(st.sc.note)}</p>` : ''}`;
     }
     const t = techById(st.it.tech);
     const thr = memberName(show, st.sc.pair[st.it.thrower]);
     const fal = memberName(show, st.sc.pair[1 - st.it.thrower]);
     return `
-      <p class="rh-scene">Scène ${st.si + 1} · ${esc(pairText(show, st.sc.pair))}${st.sc.title ? ` · ${esc(st.sc.title)}` : ''} <span>· techniek ${st.ii + 1}/${st.of}</span></p>
+      <p class="rh-scene">${esc(pairText(show, st.sc.pair))}${st.sc.title ? ` · ${esc(st.sc.title)}` : ''} <span>· techniek ${st.ii + 1}/${st.of}</span></p>
       <h2 class="rh-tech">${esc(t.name)}</h2>
       <p class="rh-meta">${esc(sportById(t.sport).name)} · ${esc(dirById(t.dir).name)} · ${esc(levelById(t.level).name)}</p>
       <div class="rh-roles">
@@ -366,38 +387,70 @@ function openRehearsal(show) {
     return `${t.name} · ${memberName(show, st.sc.pair[st.it.thrower])} werpt`;
   };
 
+  const spoken = st => {
+    if (!st.it) return `Scène ${st.si + 1}, ${pairText(show, st.sc.pair)}`;
+    const t = techById(st.it.tech);
+    return `Scène ${st.si + 1}, ${t.name}, ${memberName(show, st.sc.pair[st.it.thrower])} werpt, ${memberName(show, st.sc.pair[1 - st.it.thrower])} valt`;
+  };
+
+  // Vaste opbouw: alleen de inhoud wisselt, de knoppen blijven staan (en houden de focus).
+  root.innerHTML = `
+    <div class="rh-top">
+      <span data-rh-count></span>
+      <span class="rh-clock">
+        <span data-clock>00:00</span>
+        <button type="button" class="icon-btn" data-rh-pause aria-label="Pauzeer de tijd">${icon('pause')}</button>
+      </span>
+    </div>
+    <div class="rh-progress"><span data-rh-bar></span></div>
+    <div class="rh-card" data-rh-card></div>
+    <p class="rh-next" data-rh-nextline></p>
+    <div class="rh-nav">
+      <button type="button" class="btn btn-lg" data-rh-prev>${icon('left')} Vorige</button>
+      <button type="button" class="btn btn-lg btn-primary" data-rh-next></button>
+    </div>
+    <p class="sr" aria-live="polite" data-rh-live></p>`;
+  const $ = sel => root.querySelector(sel);
+
   const paint = () => {
-    if (pos >= steps.length) {
-      root.innerHTML = `
+    const done = pos >= steps.length;
+    root.classList.toggle('is-done', done);
+    if (done) {
+      pausedAt = pausedAt || Date.now();
+      $('[data-rh-count]').textContent = 'Doorloop klaar';
+      $('[data-rh-bar]').style.width = '100%';
+      $('[data-rh-card]').innerHTML = `
         <div class="rh-done">
-          <p class="eyebrow">Doorloop klaar</p>
-          <h2 class="rh-tech">${clock(elapsed())}</h2>
+          <p class="eyebrow">Doorlooptijd</p>
+          <p class="rh-tech">${clock(elapsed())}</p>
           <p class="muted">${sceneCount} scènes, ${steps.filter(s => s.it).length} technieken${ui.absent != null ? `, zonder ${esc(memberName(show, ui.absent))}` : ''}.</p>
           <div class="row center">
             <button type="button" class="btn" data-rh-restart>${icon('reset')} Opnieuw</button>
             <button type="button" class="btn btn-primary" data-dlg-close>Sluiten</button>
           </div>
         </div>`;
-      pausedAt = pausedAt || Date.now();
-      return;
+      $('[data-rh-nextline]').innerHTML = '';
+      $('[data-rh-live]').textContent = `Doorloop klaar in ${clock(elapsed())}`;
+    } else {
+      const st = steps[pos];
+      const sceneIndex = new Set(steps.slice(0, pos + 1).map(s => s.si)).size;
+      $('[data-rh-count]').textContent = `Scène ${sceneIndex} van ${sceneCount}${ui.absent != null ? ` · zonder ${memberName(show, ui.absent)}` : ''}`;
+      $('[data-rh-bar]').style.width = `${((pos + 1) / steps.length) * 100}%`;
+      $('[data-rh-card]').innerHTML = stepCard(st);
+      $('[data-rh-card]').scrollTop = 0;
+      $('[data-rh-nextline]').innerHTML = `<small>Hierna</small>${esc(nextLabel(steps[pos + 1]))}`;
+      $('[data-rh-live]').textContent = spoken(st);
     }
-    const st = steps[pos];
-    const sceneIndex = [...new Set(steps.slice(0, pos + 1).map(s => s.si))].length;
-    root.innerHTML = `
-      <div class="rh-top">
-        <span>Scène ${sceneIndex} van ${sceneCount}${ui.absent != null ? ` · zonder ${esc(memberName(show, ui.absent))}` : ''}</span>
-        <span class="rh-clock">
-          <span data-clock>${clock(elapsed())}</span>
-          <button type="button" class="icon-btn sm" data-rh-pause aria-label="${pausedAt ? 'Start de tijd' : 'Pauzeer de tijd'}">${icon(pausedAt ? 'play' : 'pause')}</button>
-        </span>
-      </div>
-      <div class="rh-progress"><span style="width:${((pos + 1) / steps.length) * 100}%"></span></div>
-      <div class="rh-card" aria-live="polite">${stepCard(st)}</div>
-      <p class="rh-next"><small>Hierna</small>${esc(nextLabel(steps[pos + 1]))}</p>
-      <div class="rh-nav">
-        <button type="button" class="btn btn-lg" data-rh-prev ${pos === 0 ? 'disabled' : ''}>${icon('left')} Vorige</button>
-        <button type="button" class="btn btn-lg btn-primary" data-rh-next>${pos === steps.length - 1 ? 'Afronden' : 'Volgende'} ${icon('right')}</button>
-      </div>`;
+    $('[data-rh-prev]').disabled = pos === 0;
+    const next = $('[data-rh-next]');
+    next.hidden = done;
+    next.innerHTML = `${pos >= steps.length - 1 ? 'Afronden' : 'Volgende'} ${icon('right')}`;
+    const pause = $('[data-rh-pause]');
+    pause.innerHTML = icon(pausedAt ? 'play' : 'pause');
+    pause.setAttribute('aria-label', pausedAt ? 'Start de tijd' : 'Pauzeer de tijd');
+    $('[data-clock]').textContent = clock(elapsed());
+    if (done) $('[data-rh-restart]').focus();
+    else if (!root.contains(document.activeElement) || document.activeElement.disabled) next.focus({ preventScroll: true });
   };
 
   const go = delta => {
@@ -415,18 +468,21 @@ function openRehearsal(show) {
     else if (e.target.closest('[data-rh-pause]')) togglePause();
     else if (e.target.closest('[data-rh-restart]')) { pos = 0; started = Date.now(); paused = 0; pausedAt = null; paint(); }
   });
+  // Op document, zodat pijltjes en een presentatieclicker blijven werken waar de focus ook staat
   const onKey = e => {
-    if (document.querySelector('dialog.dlg-video')) return;
-    // Spatie op een knop is al een klik; niet nog een keer doorschakelen
-    if (e.key === ' ' && e.target.closest('button')) return;
+    if (!d.open || document.querySelector('dialog.dlg-video')) return;
+    // Spatie of Enter op een knop of link doet wat die knop doet
+    if ((e.key === ' ' || e.key === 'Enter') && e.target.closest('button, a, input, textarea, select')) return;
     if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); go(1); }
     if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(-1); }
   };
-  d.addEventListener('keydown', onKey);
+  document.addEventListener('keydown', onKey);
 
+  // Vegen: horizontaal naar de volgende of vorige stap (touch-action: pan-y in de CSS)
   let sx = null;
   let sy = null;
   root.addEventListener('pointerdown', e => { sx = e.clientX; sy = e.clientY; });
+  root.addEventListener('pointercancel', () => { sx = null; });
   root.addEventListener('pointerup', e => {
     if (sx == null) return;
     const dx = e.clientX - sx;
@@ -451,25 +507,32 @@ function openRehearsal(show) {
   d.addEventListener('close', () => {
     clearInterval(timer);
     document.removeEventListener('visibilitychange', onVis);
+    document.removeEventListener('keydown', onKey);
     if (lock) lock.release().catch(() => {});
   });
   paint();
-  d.querySelector('[data-rh-next]')?.focus();
 }
 
 // ---------- Delen, bestand en draaiboek ----------
 
-function openShare(show) {
+// De deel-link wordt vooraf gemaakt, zodat kopiëren en delen direct bij de tik gebeuren (vereist op iPhone).
+let readyUrl = '';
+
+async function openShare(show) {
+  readyUrl = await shareUrl(show);
   openDialog({
     title: 'Delen en bewaren',
     body: `
       <section class="share-block">
         <h3>${icon('link')} Deel met je groep</h3>
-        <p class="muted">Je groepsgenoten openen de link en krijgen een eigen kopie van deze show op hun telefoon of laptop.</p>
+        <p class="muted">Je groepsgenoten openen de link en krijgen een eigen kopie van deze show. Gebruiken ze de app vanaf hun beginscherm? Dan kopiëren ze de link en kiezen ze Show importeren › Link plakken.</p>
         <div class="row">
           ${navigator.share ? `<button type="button" class="btn btn-primary" data-action="share-native">${icon('share')} Deel link</button>` : ''}
           <button type="button" class="btn ${navigator.share ? '' : 'btn-primary'}" data-action="share-copy">${icon('copy')} Kopieer link</button>
         </div>
+        <label class="field share-url"><span class="sr">Deel-link</span>
+          <input type="text" readonly value="${esc(readyUrl)}" data-share-url aria-label="Deel-link">
+        </label>
       </section>
       <section class="share-block">
         <h3>${icon('print')} Draaiboek</h3>
@@ -492,21 +555,34 @@ async function shareUrl(show) {
   return `${location.origin}${location.pathname}#deel=${await encodeShare(show)}`;
 }
 
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
+// Kopiëren zonder await vooraf, zodat de browser het als directe actie van de student ziet.
+function copyText(text) {
+  const fallback = () => {
+    // Het tekstvak moet in het open venster staan; alles daarbuiten is tijdelijk niet bruikbaar
+    const host = [...document.querySelectorAll('dialog[open]')].pop() || document.body;
     const ta = Object.assign(document.createElement('textarea'), { value: text });
     ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.append(ta);
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+    host.append(ta);
     ta.select();
-    const ok = document.execCommand('copy');
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { /* niet ondersteund */ }
     ta.remove();
     return ok;
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(() => true, fallback);
   }
+  return Promise.resolve(fallback());
+}
+
+const importedMessage = ({ show, dropped }) =>
+  `“${show.name}” is geïmporteerd${dropped ? `. ${dropped} ${dropped === 1 ? 'techniek kon' : 'technieken konden'} niet worden overgenomen` : ''}`;
+
+function afterImport(result) {
+  document.querySelectorAll('dialog[open]').forEach(dl => dl.close());
+  if (location.hash !== '#choreo') location.hash = '#choreo';
+  toast(importedMessage(result));
 }
 
 function pickFile() {
@@ -515,15 +591,41 @@ function pickFile() {
     const file = input.files && input.files[0];
     if (!file) return;
     try {
-      const show = importPacked(JSON.parse(await file.text()));
-      document.querySelectorAll('dialog[open]').forEach(dl => dl.close());
-      location.hash = '#choreo';
-      toast(`“${show.name}” is geïmporteerd`);
+      afterImport(importPacked(JSON.parse(await file.text())));
     } catch (e) {
       toast(e.message && e.message.startsWith('Dit is') ? e.message : 'Dit bestand kan niet worden geopend.');
     }
   });
   input.click();
+}
+
+function openImport() {
+  const d = openDialog({
+    title: 'Show importeren',
+    className: 'dlg-small',
+    body: `
+      <form class="stack" data-paste-form>
+        <label class="field"><span>Plak een deel-link</span>
+          <input type="text" inputmode="url" autocomplete="off" placeholder="https://…#deel=…" data-paste>
+        </label>
+        <button type="submit" class="btn btn-primary">${icon('link')} Link importeren</button>
+      </form>
+      <p class="or"><span>of</span></p>
+      <button type="button" class="btn btn-block" data-file>${icon('upload')} Kies een bestand (.json)</button>`,
+  });
+  const input = d.querySelector('[data-paste]');
+  d.querySelector('[data-file]').addEventListener('click', pickFile);
+  d.querySelector('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const code = shareCodeFrom(input.value);
+    if (!code) { toast('Dit lijkt geen deel-link. Kopieer de hele link opnieuw.'); input.focus(); return; }
+    try {
+      afterImport(importPacked(await decodeShare(code)));
+    } catch {
+      toast('Deze link werkt niet. Vraag je groepsgenoot om een nieuwe.');
+    }
+  });
+  input.focus();
 }
 
 function printShow(show) {
@@ -540,7 +642,7 @@ function printShow(show) {
       </table>
       <h2>Scènes</h2>
       ${show.scenes.map((sc, i) => {
-        const items = sc.items.filter(it => techById(it.tech));
+        const items = sc.pair ? sc.items.filter(it => techById(it.tech)) : [];
         return `
         <section class="doc-scene">
           <h3>${i + 1}. ${esc(pairText(show, sc.pair))}${sc.title ? ` · ${esc(sc.title)}` : ''}</h3>
@@ -566,6 +668,7 @@ function printShow(show) {
       <p class="doc-muted">Gemaakt op ${new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
     </article>`;
   document.getElementById('print-root').innerHTML = html;
+  document.body.classList.add('printing');
   document.querySelectorAll('dialog[open]').forEach(dl => dl.close());
   setTimeout(() => window.print(), 50);
 }
@@ -600,7 +703,10 @@ Object.assign(actions, {
     requestAnimationFrame(() => document.querySelector('[data-input="member"]')?.focus());
   },
 
-  'show-import': () => pickFile(),
+  'show-import': () => {
+    document.querySelectorAll('dialog[open]').forEach(dl => dl.close());
+    openImport();
+  },
 
   'show-menu': withShow(show => {
     const d = openDialog({
@@ -615,9 +721,7 @@ Object.assign(actions, {
         <button type="button" class="danger" data-action="show-delete">${icon('trash')} Show verwijderen</button>
       </div>`,
     });
-    d.querySelectorAll('[data-action]').forEach(b => b.addEventListener('click', () => {
-      if (!['show-import'].includes(b.dataset.action)) d.close();
-    }));
+    d.querySelectorAll('[data-action]').forEach(b => b.addEventListener('click', () => d.close()));
   }),
 
   'show-rename': withShow(async show => {
@@ -628,7 +732,9 @@ Object.assign(actions, {
   'show-duplicate': withShow(show => {
     const copy = JSON.parse(JSON.stringify(show));
     copy.id = uid();
-    copy.name = `${show.name} (kopie)`;
+    const names = new Set(state.shows.map(s => s.name));
+    let n = 1;
+    do { copy.name = `${show.name} (kopie${n > 1 ? ` ${n}` : ''})`; n++; } while (names.has(copy.name));
     copy.scenes.forEach(sc => { sc.id = uid(); sc.items.forEach(it => { it.id = uid(); }); });
     touch(copy);
     update(st => { st.shows.push(copy); st.activeShow = copy.id; });
@@ -655,17 +761,20 @@ Object.assign(actions, {
 
   'share-open': withShow(show => openShare(show)),
 
-  'share-copy': withShow(async show => {
-    const ok = await copyText(await shareUrl(show));
-    toast(ok ? 'Link gekopieerd. Plak hem in je groepsapp.' : 'Kopiëren lukte niet');
-  }),
-
-  'share-native': withShow(async show => {
-    try {
-      await navigator.share({ title: show.name, text: `Onze show “${show.name}” in de Val & Werp Coach`, url: await shareUrl(show) });
-    } catch (e) {
-      if (e && e.name !== 'AbortError') toast('Delen lukte niet. Kopieer de link.');
+  'share-copy': async () => {
+    const ok = await copyText(readyUrl);
+    if (ok) toast('Link gekopieerd. Plak hem in je groepsapp.');
+    else {
+      // Laatste redmiddel: de link selecteren zodat de student hem zelf kan kopiëren
+      const field = document.querySelector('[data-share-url]');
+      if (field) { field.focus(); field.select(); }
+      toast('Kopiëren lukte niet automatisch. De link is geselecteerd: kopieer hem zelf.');
     }
+  },
+
+  'share-native': withShow(show => {
+    navigator.share({ title: show.name, text: `Onze show “${show.name}” in de Val & Werp Coach`, url: readyUrl })
+      .catch(e => { if (e && e.name !== 'AbortError') toast('Delen lukte niet. Kopieer de link.'); });
   }),
 
   rehearse: withShow(show => openRehearsal(show)),
@@ -675,9 +784,10 @@ Object.assign(actions, {
     refreshParts();
   }),
 
+  // Een weergavekeuze: niet opslaan, alleen opnieuw tekenen
   absent: el => {
     ui.absent = el.dataset.i === '' ? null : Number(el.dataset.i);
-    update(() => {});
+    rerender();
   },
 
   'scene-add': withShow(show => {
@@ -727,7 +837,15 @@ Object.assign(actions, {
   }),
 
   'item-remove': withScene((show, sc, el) => {
-    update(() => { sc.items = sc.items.filter(x => x.id !== el.dataset.item); touch(show); });
+    const index = sc.items.findIndex(x => x.id === el.dataset.item);
+    if (index < 0) return;
+    const [removed] = sc.items.slice(index, index + 1);
+    const t = techById(removed.tech);
+    update(() => { sc.items.splice(index, 1); touch(show); });
+    toast(`${t ? t.name : 'Techniek'} verwijderd`, {
+      action: 'Ongedaan maken',
+      onAction: () => update(() => { sc.items.splice(Math.min(index, sc.items.length), 0, removed); touch(show); }),
+    });
   }),
 
   // Vanuit de bibliotheek: kies in welke scène de techniek komt
@@ -746,7 +864,7 @@ Object.assign(actions, {
       body: duos.length
         ? `<p class="muted">Aan welke scène van “${esc(show.name)}”?</p>
            <div class="menu">${duos.map(sc => `
-             <button type="button" data-scene-pick="${sc.id}">
+             <button type="button" data-scene-pick="${esc(sc.id)}">
                <span class="scene-num sm">${show.scenes.indexOf(sc) + 1}</span>${pairLabel(show, sc.pair)}
                <small>${sc.items.length} ${sc.items.length === 1 ? 'techniek' : 'technieken'}</small>
              </button>`).join('')}</div>`
@@ -818,4 +936,7 @@ document.addEventListener('toggle', e => {
 }, true);
 
 // Na het afdrukken het draaiboek weer opruimen
-addEventListener('afterprint', () => { document.getElementById('print-root').innerHTML = ''; });
+addEventListener('afterprint', () => {
+  document.getElementById('print-root').innerHTML = '';
+  document.body.classList.remove('printing');
+});

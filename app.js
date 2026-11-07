@@ -21,12 +21,19 @@ function routeId() {
   return ROUTES.some(r => r.id === id) ? id : null;
 }
 
+// De links één keer tekenen en daarna alleen de actieve markeren, zodat de focus op de link blijft.
 function renderNav() {
-  const links = ROUTES.map(r => `
-    <a href="#${r.id}" class="${r.id === current ? 'active' : ''}" ${r.id === current ? 'aria-current="page"' : ''}>
-      ${icon(r.id)}<span>${r.label}</span>
-    </a>`).join('');
-  document.querySelectorAll('[data-nav]').forEach(n => { n.innerHTML = links; });
+  document.querySelectorAll('[data-nav]').forEach(n => {
+    if (!n.children.length) {
+      n.innerHTML = ROUTES.map(r => `<a href="#${r.id}" data-route="${r.id}">${icon(r.id)}<span>${r.label}</span></a>`).join('');
+    }
+    n.querySelectorAll('a').forEach(a => {
+      const on = a.dataset.route === current;
+      a.classList.toggle('active', on);
+      if (on) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+  });
 }
 
 function render() {
@@ -45,6 +52,7 @@ function go() {
     history.replaceState(null, '', `#${ROUTES.some(r => r.id === last) ? last : 'toets'}`);
     return go();
   }
+  const first = current === null;
   const changed = id !== current;
   current = id;
   try { localStorage.setItem(TAB_KEY, id); } catch { /* geen opslag */ }
@@ -53,6 +61,8 @@ function go() {
   if (changed) {
     window.scrollTo(0, 0);
     document.title = `${ROUTES.find(r => r.id === id).label} · Val & Werp Coach`;
+    // Schermlezers en toetsenbord beginnen bij de nieuwe inhoud
+    if (!first && !document.querySelector('dialog[open]')) main.focus({ preventScroll: true });
   }
 }
 
@@ -67,8 +77,8 @@ async function handleShareLink() {
     const ok = await confirmDialog(`Je krijgt een eigen kopie van “${name}”. Je eigen shows blijven gewoon bestaan.`,
       { title: 'Gedeelde show openen?', ok: 'Toevoegen', danger: false });
     if (ok) {
-      importPacked(data);
-      toast(`“${name}” staat nu bij Mijn show`);
+      const { show, dropped } = importPacked(data);
+      toast(`“${show.name}” staat nu bij Mijn show${dropped ? `. ${dropped} ${dropped === 1 ? 'techniek kon' : 'technieken konden'} niet worden overgenomen` : ''}`);
     }
   } catch {
     toast('Deze deel-link werkt niet. Vraag je groepsgenoot om een nieuwe.');
@@ -95,8 +105,8 @@ document.addEventListener('input', e => {
 });
 
 subscribe(type => {
-  if (type === 'save-failed') {
-    toast('Opslaan lukt niet. Is de opslag van je browser vol of uitgeschakeld?');
+  if (type === 'save-failed' || type === 'save-ok') {
+    document.getElementById('save-error').hidden = type === 'save-ok';
     return;
   }
   render();

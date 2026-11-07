@@ -15,7 +15,10 @@ export function refreshParts(root = document) {
   root.querySelectorAll('[data-part]').forEach(el => {
     const fn = parts[el.dataset.part];
     if (!fn || (typing && el.contains(ae))) return;
+    // Horizontaal gescrolde chiprijen op dezelfde plek houden
+    const scroll = [...el.querySelectorAll('.chips')].map(c => c.scrollLeft);
     el.innerHTML = fn(el.dataset);
+    el.querySelectorAll('.chips').forEach((c, i) => { c.scrollLeft = scroll[i] || 0; });
   });
   if (!typing) restoreFocus(key);
 }
@@ -24,12 +27,15 @@ export function refreshParts(root = document) {
 export function focusKey(el) {
   if (!el || !el.dataset || !el.dataset.action) return null;
   const d = el.dataset;
-  return [d.action, d.id, d.scene, d.item, d.key, d.val, d.scope, d.i].join('|');
+  return [d.action, d.id, d.scene, d.item, d.key, d.val, d.scope, d.i, d.dir, el.classList[0]].join('|');
 }
 export function restoreFocus(key) {
   if (!key || (document.activeElement && document.activeElement !== document.body && document.contains(document.activeElement))) return;
   const el = [...document.querySelectorAll('[data-action]')].find(e => focusKey(e) === key);
-  if (el) el.focus({ preventScroll: true });
+  if (!el) return;
+  // Een uitgeschakelde knop (bijvoorbeeld Omlaag bij het laatste item) kan geen focus krijgen: neem de buurknop
+  const target = el.disabled ? el.parentElement.querySelector('[data-action]:not([disabled])') : el;
+  if (target) target.focus({ preventScroll: true });
 }
 
 const ICONS = {
@@ -73,30 +79,45 @@ export const icon = (name, cls = '') => `<svg class="i i-${name} ${cls}" viewBox
 
 // ---------- Meldingen ----------
 
-// De melding is een popover, zodat hij ook boven een geopend dialoogvenster verschijnt.
+// De melding komt in het bovenste open dialoogvenster te staan (anders is hij daar onzichtbaar en
+// onhoorbaar). Met een actie, zoals 'Ongedaan maken', blijft hij langer staan.
 let toastTimer;
-export function toast(msg) {
+export function toast(msg, { action, onAction } = {}) {
   const el = document.getElementById('toast');
-  el.textContent = msg;
-  if (el.showPopover) {
-    try { if (el.matches(':popover-open')) el.hidePopover(); el.showPopover(); } catch { /* geen popover-ondersteuning */ }
-  }
-  requestAnimationFrame(() => el.classList.add('show'));
+  const host = [...document.querySelectorAll('dialog[open]')].pop() || document.body;
+  if (el.parentElement !== host) host.append(el);
+  el.innerHTML = '';
+  el.classList.add('show');
+  // Tekst een tik later zetten, zodat schermlezers de wijziging oppikken
+  setTimeout(() => {
+    el.textContent = msg;
+    if (action) {
+      const b = Object.assign(document.createElement('button'), { type: 'button', textContent: action, className: 'toast-action' });
+      b.addEventListener('click', () => { hide(); onAction && onAction(); });
+      el.append(' ', b);
+    }
+  }, 30);
+  el.classList.toggle('has-action', !!action);
+  const hide = () => {
+    clearTimeout(toastTimer);
+    el.classList.remove('show', 'has-action');
+  };
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    el.classList.remove('show');
-    setTimeout(() => { if (!el.classList.contains('show') && el.hidePopover) { try { el.hidePopover(); } catch { /* al dicht */ } } }, 250);
-  }, 2600);
+  toastTimer = setTimeout(hide, action ? 6000 : Math.max(2600, msg.length * 60));
 }
 
 // ---------- Dialogen (onderaan als sheet op de telefoon, gecentreerd op de laptop) ----------
 
+let dlgCount = 0;
 export function openDialog({ title, body, className = '', onClose, footer = '' }) {
+  const back = focusKey(document.activeElement);
   const d = document.createElement('dialog');
+  const titleId = `dlg-title-${++dlgCount}`;
   d.className = `dlg ${className}`;
+  d.setAttribute('aria-labelledby', titleId);
   d.innerHTML = `
     <div class="dlg-head">
-      <h2 class="dlg-title">${esc(title)}</h2>
+      <h2 class="dlg-title" id="${titleId}">${esc(title)}</h2>
       <button type="button" class="icon-btn" data-dlg-close aria-label="Sluiten">${icon('x')}</button>
     </div>
     <div class="dlg-body">${body}</div>
@@ -107,8 +128,12 @@ export function openDialog({ title, body, className = '', onClose, footer = '' }
   const finish = () => {
     if (done) return;
     done = true;
+    const t = document.getElementById('toast');
+    if (t && d.contains(t)) document.body.append(t);
     d.remove();
     if (!document.querySelector('dialog[open]')) document.body.classList.remove('has-dialog');
+    // Focus terug naar de knop die het venster opende (ook als die intussen opnieuw getekend is)
+    restoreFocus(back);
     onClose && onClose();
   };
   const nativeClose = d.close.bind(d);
@@ -134,7 +159,8 @@ export function confirmDialog(message, { title = 'Weet je het zeker?', ok = 'Ver
       onClose: () => resolve(result),
     });
     d.querySelector('[data-ok]').addEventListener('click', () => { result = true; d.close(); });
-    d.querySelector('[data-ok]').focus();
+    // Bij verwijderen staat de focus op Annuleren, zodat één Enter niets kapotmaakt
+    d.querySelector(danger ? '.dlg-foot [data-dlg-close]' : '[data-ok]').focus();
   });
 }
 

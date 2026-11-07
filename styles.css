@@ -11,6 +11,9 @@
   --card: #fff;
   --accent: #e50056;
   --accent-dark: #b80046;
+  --input-line: #8a8682;
+  --pad-l: max(16px, env(safe-area-inset-left));
+  --pad-r: max(16px, env(safe-area-inset-right));
   --accent-on-dark: #ff4f8b;
   --accent-soft: #fde9f0;
   --danger: #b42318;
@@ -23,6 +26,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 html { -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--top-h) + 12px); }
 
@@ -59,7 +63,7 @@ button { cursor: pointer; }
 /* ---------- Kop en navigatie ---------- */
 
 .topbar { position: sticky; top: 0; z-index: 20; background: var(--ink); color: #fff; }
-.topbar-inner { max-width: 1160px; margin: 0 auto; height: var(--top-h); padding: 0 16px; display: flex; align-items: center; gap: 24px; }
+.topbar-inner { max-width: 1160px; margin: 0 auto; height: var(--top-h); padding: 0 var(--pad-r) 0 var(--pad-l); display: flex; align-items: center; gap: 24px; }
 .brand { display: flex; align-items: center; gap: 12px; color: #fff; text-decoration: none; min-width: 0; }
 .brand-mark { display: inline-flex; align-items: center; font-weight: 800; font-size: 13px; letter-spacing: .04em; }
 .brand-mark b { background: var(--accent); color: #fff; padding: 3px 6px; margin-left: 4px; border-radius: 3px; }
@@ -75,7 +79,7 @@ button { cursor: pointer; }
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
   display: grid; grid-template-columns: repeat(5, 1fr);
   background: #fff; border-top: 1px solid var(--line);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 .tabbar a { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: var(--tabbar-h); color: var(--muted); text-decoration: none; font-size: 11px; font-weight: 600; }
 .tabbar a.active { color: var(--accent); font-weight: 800; }
@@ -90,14 +94,15 @@ button { cursor: pointer; }
 /* ---------- Pagina ---------- */
 
 #main { outline: none; }
-.page { max-width: 1160px; margin: 0 auto; padding: 24px 16px 40px; }
+.page { max-width: 1160px; margin: 0 auto; padding: 24px var(--pad-r) 40px var(--pad-l); }
 .page-head { margin-bottom: 20px; }
-.eyebrow { margin: 0 0 6px; text-transform: uppercase; letter-spacing: .08em; font-size: 12px; font-weight: 800; color: var(--accent); }
+.eyebrow { margin: 0 0 6px; text-transform: uppercase; letter-spacing: .08em; font-size: 12px; font-weight: 800; color: var(--accent-dark); }
 .eyebrow.on-dark { color: var(--accent-on-dark); }
 .lead { font-size: 1.06rem; color: var(--ink-2); max-width: 68ch; margin: 0; }
 .summary { color: var(--ink-2); max-width: 72ch; margin: 24px 0 0; }
 
-.foot { max-width: 1160px; margin: 0 auto; padding: 8px 16px calc(var(--tabbar-h) + 28px + env(safe-area-inset-bottom)); color: var(--muted); font-size: 13px; }
+.foot { max-width: 1160px; margin: 0 auto; padding: 8px var(--pad-r) calc(var(--tabbar-h) + 28px + env(safe-area-inset-bottom)) var(--pad-l); color: var(--muted); font-size: 13px; }
+.save-error { position: fixed; top: var(--top-h); left: 0; right: 0; z-index: 19; margin: 0; padding: 10px var(--pad-r) 10px var(--pad-l); background: var(--danger); color: #fff; font-weight: 700; font-size: 14px; }
 .foot p { margin: 2px 0; }
 @media (min-width: 900px) { .foot { padding-bottom: 32px; } }
 
@@ -152,7 +157,14 @@ button { cursor: pointer; }
 .icon-btn.add.on { width: auto; min-width: 44px; padding: 0 10px; display: inline-flex; gap: 3px; background: var(--accent-soft); }
 .icon-btn.add.on .i { width: 16px; height: 16px; stroke-width: 3; }
 
-.link-btn { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.link-btn { background: none; border: 0; padding: 10px 0; margin: -10px 0; color: var(--accent-dark); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+/* Op touchscreens: ruimere tikdoelen */
+@media (pointer: coarse) {
+  .icon-btn.sm { width: 44px; height: 44px; }
+  .chip { min-height: 40px; }
+  .item-tools { gap: 4px; }
+}
 
 /* ---------- Kleine onderdelen ---------- */
 
@@ -241,7 +253,7 @@ details.why[open] summary { margin-bottom: 12px; }
 details[open] > summary .chev { transform: rotate(180deg); }
 .why-point h3 { margin: 8px 0 4px; }
 .why-point p { margin: 0; color: var(--ink-2); }
-.num { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 800; }
+.num { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-dark); font-weight: 800; }
 
 /* ---------- Sporten ---------- */
 
@@ -260,6 +272,10 @@ details[open] > summary .chev { transform: rotate(180deg); }
   .lib { grid-template-columns: 300px minmax(0, 1fr); align-items: start; }
   .lib-tools { position: sticky; top: calc(var(--top-h) + 16px); }
   .lib-tools .chips { flex-wrap: wrap; overflow: visible; }
+}
+/* Met een muis kun je niet horizontaal vegen: chips dan laten doorlopen op een nieuwe regel */
+@media (pointer: fine) {
+  .picker-tools .chips { flex-wrap: wrap; overflow: visible; }
 }
 
 .search { display: flex; align-items: center; gap: 8px; background: #fff; border: 1.5px solid var(--line-2); border-radius: 12px; padding: 0 12px; min-height: 46px; }
@@ -318,33 +334,35 @@ details[open] > summary .chev { transform: rotate(180deg); }
 body.has-dialog { overflow: hidden; }
 dialog.dlg {
   border: 0; padding: 0; border-radius: 16px; background: #fff; color: var(--ink);
-  width: min(560px, calc(100vw - 32px)); max-width: none; max-height: min(86vh, 860px);
+  width: min(560px, calc(100vw - 32px)); max-width: none;
+  max-height: min(86vh, 860px); max-height: min(86dvh, 860px);
   box-shadow: 0 24px 64px rgba(0, 0, 0, .28);
 }
 dialog.dlg[open] { display: flex; flex-direction: column; animation: dlg-in .18s ease-out; }
 dialog.dlg::backdrop { background: rgba(20, 20, 20, .55); }
 @keyframes dlg-in { from { transform: translateY(16px); opacity: 0; } }
-.dlg-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 8px 12px 20px; border-bottom: 1px solid var(--line); }
+.dlg-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px max(8px, env(safe-area-inset-right)) 12px max(20px, env(safe-area-inset-left)); border-bottom: 1px solid var(--line); }
 .dlg-title { margin: 0; font-size: 1.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dlg-body { padding: 16px 20px 20px; overflow: auto; flex: 1; overscroll-behavior: contain; }
+.dlg-body { padding: 16px max(20px, env(safe-area-inset-right)) 20px max(20px, env(safe-area-inset-left)); overflow: auto; flex: 1; overscroll-behavior: contain; }
+.dlg-body:last-child { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
 .dlg-body > p:last-child { margin-bottom: 0; }
 .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
 .dlg-small { width: min(440px, calc(100vw - 32px)); }
-.dlg-tall { height: min(86vh, 860px); }
+.dlg-tall { height: min(86vh, 860px); height: min(86dvh, 860px); }
 .dlg-video { width: min(900px, calc(100vw - 24px)); }
 .video-frame { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 12px; }
 .video-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 
 @media (max-width: 640px) {
   dialog.dlg:not(.dlg-full):not(.dlg-video) {
-    width: 100%; max-height: 92vh; margin: auto 0 0; border-radius: 18px 18px 0 0;
+    width: 100%; max-height: 92vh; max-height: 92dvh; margin: auto 0 0; border-radius: 18px 18px 0 0;
   }
-  dialog.dlg.dlg-tall { height: 92vh; }
+  dialog.dlg.dlg-tall { height: 92vh; height: 92dvh; }
   .dlg-foot .btn { flex: 1; }
 }
 
 dialog.dlg-full { width: 100vw; height: 100vh; height: 100dvh; max-height: none; margin: 0; border-radius: 0; }
-.dlg-full .dlg-body { padding: 0; display: flex; }
+.dlg-full .dlg-body { padding: 0; display: flex; overflow: hidden; }
 
 .picker-tools { position: sticky; top: -16px; z-index: 1; background: #fff; margin: -16px -20px 12px; padding: 12px 20px 6px; border-bottom: 1px solid var(--line); }
 
@@ -357,6 +375,10 @@ dialog.dlg-full { width: 100vw; height: 100vh; height: 100dvh; max-height: none;
 .share-block h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; }
 .share-block h3 .i { color: var(--accent); }
 .share-block p { margin: 0 0 12px; }
+.share-url { margin-top: 10px; }
+.share-url input { font-size: 13px; color: var(--muted); background: var(--soft); }
+.or { display: flex; align-items: center; gap: 10px; margin: 16px 0; color: var(--muted); font-size: 13px; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 
 .toast {
   position: fixed; inset: auto auto calc(var(--tabbar-h) + 18px + env(safe-area-inset-bottom)) 50%;
@@ -367,6 +389,9 @@ dialog.dlg-full { width: 100vw; height: 100vh; height: 100dvh; max-height: none;
   opacity: 0; pointer-events: none; transition: opacity .2s;
 }
 .toast.show { opacity: 1; }
+.toast.has-action { pointer-events: auto; }
+.toast-action { margin-left: 10px; padding: 6px 10px; min-height: 36px; border: 1.5px solid #fff; border-radius: 8px; background: transparent; color: #fff; font-weight: 800; }
+dialog .toast { bottom: calc(80px + env(safe-area-inset-bottom)); }
 @media (min-width: 900px) { .toast { bottom: 28px; } }
 
 /* ---------- Mijn show ---------- */
@@ -428,9 +453,9 @@ details.setup[open] summary { margin-bottom: 14px; }
 .status.ok { color: var(--accent); }
 .status .i { width: 15px; height: 15px; stroke-width: 3; }
 .scene-tools { display: flex; margin-right: -6px; }
-.scene-title { width: 100%; padding: 4px 0; border: 0; border-bottom: 1.5px dashed var(--line-2); background: transparent; font-size: 15px; font-weight: 600; outline: none; border-radius: 0; }
+.scene-title { width: 100%; padding: 4px 0; border: 0; border-bottom: 1.5px dashed var(--input-line); background: transparent; font-size: 15px; font-weight: 600; outline: none; border-radius: 0; }
 .scene-title:focus { border-bottom: 1.5px solid var(--accent); }
-.scene-title::placeholder, .item-note::placeholder, .scene-note::placeholder { color: #9a9794; font-weight: 400; }
+.scene-title::placeholder, .item-note::placeholder, .scene-note::placeholder { color: var(--muted); font-weight: 400; }
 
 .items { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .item { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 6px 10px 10px; border-radius: 12px; background: var(--soft); }
@@ -441,7 +466,7 @@ details.setup[open] summary { margin-bottom: 14px; }
 .roles { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
 .role { display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #fff; border: 1px solid var(--line); font-weight: 700; font-size: 14px; max-width: 100%; overflow-wrap: anywhere; }
 .role small { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.item-note { width: 100%; padding: 5px 0; border: 0; border-bottom: 1px solid var(--line-2); background: transparent; font-size: 14px; outline: none; border-radius: 0; }
+.item-note { width: 100%; padding: 5px 0; border: 0; border-bottom: 1px solid var(--input-line); background: transparent; font-size: 14px; outline: none; border-radius: 0; }
 .item-note:focus { border-bottom-color: var(--accent); }
 .item-tools { display: grid; }
 .btn-add { justify-self: start; }
@@ -454,8 +479,12 @@ details.setup[open] summary { margin-bottom: 14px; }
   .role small { font-size: 10px; }
   .roles .icon-btn.sm { width: 32px; height: 32px; }
 }
-.scene-note { width: 100%; min-height: 40px; padding: 9px 11px; border: 1.5px solid transparent; border-radius: var(--radius-sm); background: var(--soft); font-size: 14px; line-height: 1.4; resize: none; overflow: hidden; field-sizing: content; }
-.scene-note:focus { outline: none; background: #fff; border-color: var(--line-2); }
+.scene-note { width: 100%; min-height: 40px; padding: 9px 11px; border: 1.5px solid var(--line-2); border-radius: var(--radius-sm); background: var(--soft); font-size: 14px; line-height: 1.4; resize: none; overflow: hidden; field-sizing: content; }
+.scene-note:focus { outline: none; background: #fff; border-color: var(--ink); }
+/* iOS zoomt in bij invoervelden kleiner dan 16px */
+@media (pointer: coarse) {
+  .scene-title, .item-note, .scene-note { font-size: 16px; }
+}
 
 .checks-card h2 { margin-bottom: 6px; }
 .all-good { display: flex; gap: 8px; align-items: center; margin: 8px 0 4px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--accent); color: #fff; font-weight: 700; }
@@ -482,6 +511,9 @@ details.setup[open] summary { margin-bottom: 14px; }
 .role-grid tbody th { text-align: left; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .role-grid tbody tr + tr { border-top: 1px solid var(--line); }
 .uitval-result { margin: 10px 0 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--soft); font-size: 14px; }
+.uitval-result p { margin: 0 0 6px; }
+.uitval-result p:last-child { margin: 0; }
+.uitval-result ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
 
 .steps { list-style: none; counter-reset: s; padding: 0; margin: 0 0 20px; display: grid; gap: 10px; max-width: 660px; }
 .steps li { counter-increment: s; display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: center; padding: 14px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
@@ -490,12 +522,15 @@ details.setup[open] summary { margin-bottom: 14px; }
 
 /* ---------- Oefenmodus ---------- */
 
-.rh { flex: 1; width: 100%; max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; padding: 16px 20px calc(18px + env(safe-area-inset-bottom)); }
+/* De knoppen staan altijd onderin in beeld; alleen de kaart scrolt als er veel tekst is. Vegen: pan-y. */
+.rh { flex: 1; min-height: 0; width: 100%; max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; padding: 16px max(20px, env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); touch-action: pan-y pinch-zoom; }
 .rh-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; font-weight: 700; color: var(--muted); }
 .rh-clock { display: inline-flex; align-items: center; gap: 2px; font-size: 17px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .rh-progress { height: 6px; border-radius: 99px; background: #ecebe9; overflow: hidden; }
 .rh-progress span { display: block; height: 100%; background: var(--accent); transition: width .25s; }
-.rh-card { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px; text-align: center; padding: 8px 0; }
+.rh-card { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; text-align: center; padding: 8px 0; -webkit-user-select: none; user-select: none; }
+.rh-card > :first-child { margin-top: auto; }
+.rh-card > :last-child { margin-bottom: auto; }
 .rh-scene { margin: 0; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
 .rh-scene span { color: var(--muted); }
 .rh-tech { margin: 0; font-family: var(--font-head); font-size: clamp(2.1rem, 10vw, 3.8rem); line-height: 1.02; font-weight: 800; overflow-wrap: anywhere; }
@@ -503,7 +538,7 @@ details.setup[open] summary { margin-bottom: 14px; }
 .rh-roles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 6px 0; }
 .rh-roles div { display: grid; gap: 2px; padding: 14px 10px; border-radius: 14px; background: var(--ink); color: #fff; }
 .rh-roles div:last-child { background: var(--accent); }
-.rh-roles small { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; opacity: .8; }
+.rh-roles small { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 .rh-roles b { font-size: clamp(1.3rem, 6.5vw, 2.1rem); overflow-wrap: anywhere; line-height: 1.1; }
 .rh-note { margin: 0; display: inline-flex; justify-content: center; align-items: center; gap: 8px; font-size: 1.12rem; font-weight: 700; }
 .rh-note .i { color: var(--accent); }
@@ -511,16 +546,32 @@ details.setup[open] summary { margin-bottom: 14px; }
 .rh-card .btn { align-self: center; }
 .rh-next { margin: 0; text-align: center; font-size: 14px; color: var(--muted); }
 .rh-next small { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-.rh-nav { display: flex; gap: 10px; }
-.rh-done { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; text-align: center; }
+.rh-nav { display: flex; gap: 10px; flex: none; }
+.rh-done { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.rh-done .rh-tech { font-variant-numeric: tabular-nums; }
+.rh-regie { white-space: pre-line; }
+/* Lage schermen (kleine telefoons, liggend): alles compacter */
+@media (max-height: 700px) {
+  .rehearsal .dlg-head { padding-top: 6px; padding-bottom: 6px; }
+  .rh { gap: 8px; padding-top: 10px; }
+  .rh-card { gap: 8px; }
+  .rh-tech { font-size: clamp(1.7rem, 8vw, 2.6rem); }
+  .rh-roles div { padding: 9px 8px; }
+  .rh-roles b { font-size: clamp(1.15rem, 5.5vw, 1.6rem); }
+  .rh-regie { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .btn-lg { min-height: 52px; }
+}
 
 /* ---------- Draaiboek (afdrukken / PDF) ---------- */
 
 #print-root { display: none; }
 @media print {
   body { background: #fff; }
-  body > *:not(#print-root) { display: none !important; }
-  #print-root { display: block; }
+  /* Draaiboek: alleen dat afdrukken. Anders (Ctrl+P) gewoon de pagina zonder menu's. */
+  body.printing > *:not(#print-root) { display: none !important; }
+  body.printing #print-root { display: block; }
+  .topbar, .tabbar, .toast, .foot, .show-actions, .scene-tools, .item-tools, .btn-add, .btn-dashed { display: none !important; }
+  .card, .scene { break-inside: avoid; }
   @page { margin: 16mm; }
   .doc { font-size: 10.5pt; line-height: 1.4; color: #000; }
   .doc-kicker { margin: 0; color: #e50056; font-weight: 700; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .06em; }

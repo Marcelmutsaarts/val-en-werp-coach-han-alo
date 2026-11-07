@@ -9,6 +9,11 @@ export const PAIRS = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
 
 export const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
 
+// Ids komen ook uit gedeelde links en bestanden: alleen veilige tekens toestaan.
+const ID_RE = /^[a-z0-9][\w-]{0,39}$/i;
+const CUSTOM_RE = /^c-[\w-]{1,38}$/;
+const okId = v => typeof v === 'string' && ID_RE.test(v);
+
 function blank() {
   return { v: 1, favorites: [], techNotes: {}, custom: [], shows: [], activeShow: null };
 }
@@ -40,14 +45,28 @@ export function flush() {
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
     dirty = false;
+    if (failed) listeners.forEach(fn => fn('save-ok'));
     failed = false;
   } catch (e) {
-    if (!failed) listeners.forEach(fn => fn('save-failed'));
     failed = true;
+    listeners.forEach(fn => fn('save-failed'));
   }
 }
 addEventListener('pagehide', flush);
 addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+
+// Een ander tabblad (bijvoorbeeld na het openen van een deel-link) heeft iets opgeslagen: overnemen.
+addEventListener('storage', e => {
+  if (e.key !== KEY || e.newValue == null) return;
+  try {
+    const next = sanitizeState(JSON.parse(e.newValue));
+    Object.keys(state).forEach(k => delete state[k]);
+    Object.assign(state, next);
+    dirty = false;
+    clearTimeout(timer);
+    listeners.forEach(l => l('change'));
+  } catch { /* onleesbaar: negeren */ }
+});
 
 const listeners = new Set();
 export const subscribe = fn => listeners.add(fn);
@@ -56,6 +75,11 @@ export const subscribe = fn => listeners.add(fn);
 export function update(fn) {
   fn(state);
   save();
+  listeners.forEach(l => l('change'));
+}
+
+// Alleen opnieuw tekenen (weergavekeuzes die niet bewaard hoeven te worden).
+export function rerender() {
   listeners.forEach(l => l('change'));
 }
 
@@ -100,18 +124,20 @@ export function memberName(show, i) {
 
 // ---------- Validatie (ook voor geïmporteerde bestanden en deel-links) ----------
 
-const str = (v, max = 2000) => (typeof v === 'string' ? v.slice(0, max) : '');
+const str = (v, max = 2000) => (typeof v === 'string' ? v.slice(0, max) : typeof v === 'number' ? String(v) : '');
 
 export function sanitizeTechnique(t) {
   if (!t || typeof t !== 'object') return null;
   const name = str(t.name, 120).trim();
   if (!name) return null;
+  const level = LEVELS.some(l => l.id === t.level) ? t.level : LEVELS[0].id;
   return {
-    id: str(t.id, 40) || 'c-' + uid(),
+    id: typeof t.id === 'string' && CUSTOM_RE.test(t.id) ? t.id : `c-${uid()}`,
     name,
     sport: SPORTS.some(s => s.id === t.sport) ? t.sport : SPORTS[0].id,
     dir: DIRECTIONS.some(d => d.id === t.dir) ? t.dir : DIRECTIONS[0].id,
-    level: LEVELS.some(l => l.id === t.level) ? t.level : LEVELS[0].id,
+    level,
+    height: level === 'uitdagend' ? (t.height === 'laag' ? 'laag' : 'hoog') : level,
     video: safeUrl(t.video),
     custom: true,
   };
@@ -126,24 +152,28 @@ export function safeUrl(u) {
   } catch { return ''; }
 }
 
-export function sanitizeShow(s) {
+// fresh: alle ids opnieuw uitdelen (bij import), zodat vreemde of dubbele ids nooit binnenkomen.
+export function sanitizeShow(s, { fresh = false } = {}) {
   if (!s || typeof s !== 'object') return null;
   const members = Array.isArray(s.members) ? s.members : [];
   const validPair = p => Array.isArray(p) && p.length === 2 && p.every(i => Number.isInteger(i) && i >= 0 && i < 4) && p[0] !== p[1];
-  const scenes = (Array.isArray(s.scenes) ? s.scenes : []).slice(0, 40).map(sc => ({
-    id: str(sc && sc.id, 40) || uid(),
-    pair: sc && validPair(sc.pair) ? [sc.pair[0], sc.pair[1]] : null,
-    title: str(sc && sc.title, 120),
-    note: str(sc && sc.note),
-    items: (Array.isArray(sc && sc.items) ? sc.items : []).slice(0, 30).map(it => ({
-      id: str(it && it.id, 40) || uid(),
-      tech: str(it && it.tech, 40),
-      thrower: it && it.thrower === 1 ? 1 : 0,
-      note: str(it && it.note, 500),
-    })).filter(it => it.tech),
-  }));
+  const id = v => (!fresh && okId(v) ? v : uid());
+  const scenes = (Array.isArray(s.scenes) ? s.scenes : []).slice(0, 40).filter(sc => sc && typeof sc === 'object').map(sc => {
+    const pair = validPair(sc.pair) ? [sc.pair[0], sc.pair[1]] : null;
+    return {
+      id: id(sc.id),
+      pair,
+      title: str(sc.title, 120),
+      note: str(sc.note),
+      // Een groepsscène heeft geen werper en valler, dus ook geen technieken
+      items: !pair ? [] : (Array.isArray(sc.items) ? sc.items : []).slice(0, 30)
+        .filter(it => it && typeof it === 'object')
+        .map(it => ({ id: id(it.id), tech: str(it.tech, 40), thrower: it.thrower === 1 ? 1 : 0, note: str(it.note, 500) }))
+        .filter(it => okId(it.tech)),
+    };
+  });
   return {
-    id: str(s.id, 40) || uid(),
+    id: id(s.id),
     name: str(s.name, 80).trim() || 'Show',
     members: [0, 1, 2, 3].map(i => str(members[i], 40)),
     theme: str(s.theme, 200),
@@ -159,19 +189,14 @@ function sanitizeState(d) {
   const s = blank();
   if (!d || typeof d !== 'object') return s;
   s.custom = (Array.isArray(d.custom) ? d.custom : []).map(sanitizeTechnique).filter(Boolean);
-  const ids = new Set(allIds(s.custom));
+  const ids = new Set([...TECHNIQUES.map(t => t.id), ...s.custom.map(t => t.id)]);
   s.favorites = (Array.isArray(d.favorites) ? d.favorites : []).filter(id => ids.has(id));
-  s.techNotes = {};
   if (d.techNotes && typeof d.techNotes === 'object') {
     for (const [k, v] of Object.entries(d.techNotes)) if (ids.has(k) && typeof v === 'string' && v) s.techNotes[k] = v.slice(0, 2000);
   }
-  s.shows = (Array.isArray(d.shows) ? d.shows : []).map(sanitizeShow).filter(Boolean);
-  s.activeShow = typeof d.activeShow === 'string' ? d.activeShow : null;
+  s.shows = (Array.isArray(d.shows) ? d.shows : []).map(x => sanitizeShow(x)).filter(Boolean);
+  s.activeShow = okId(d.activeShow) ? d.activeShow : null;
   return s;
-}
-
-function allIds(custom) {
-  return [...TECHNIQUES.map(t => t.id), ...custom.map(t => t.id)];
 }
 
 // ---------- Delen: bestand en link ----------
@@ -187,41 +212,79 @@ export function packShow(show) {
   };
 }
 
+function freeName(name) {
+  const names = new Set(state.shows.map(s => s.name));
+  if (!names.has(name)) return name;
+  for (let n = 1; ; n++) {
+    const candidate = `${name} (kopie${n > 1 ? ` ${n}` : ''})`;
+    if (!names.has(candidate)) return candidate;
+  }
+}
+
 // Voeg een geïmporteerde show toe als nieuwe kopie; overschrijft nooit iets.
+// Geeft de show terug en hoeveel technieken niet konden worden overgenomen.
 export function importPacked(data) {
   const raw = data && data.app === 'val-werp-coach' ? data : null;
   // Ook een losse show en een export uit de vorige versie van de app accepteren
   const showData = raw ? raw.show : data && Array.isArray(data.duos) ? fromLegacy(data) : data;
-  const show = sanitizeShow(showData);
-  if (!show || !Array.isArray(showData && showData.scenes)) throw new Error('Dit is geen geldig showbestand.');
-  const customs = (raw && Array.isArray(raw.custom) ? raw.custom : []).map(sanitizeTechnique).filter(Boolean);
+  if (!showData || !Array.isArray(showData.scenes)) throw new Error('Dit is geen geldig showbestand.');
+
+  // Eigen technieken krijgen een nieuw id als dat bij ons al voor iets anders bestaat
+  const remap = Object.create(null);
+  const customs = [];
+  for (const rawT of raw && Array.isArray(raw.custom) ? raw.custom.slice(0, 200) : []) {
+    const t = sanitizeTechnique(rawT);
+    if (!t) continue;
+    const mine = state.custom.find(x => x.id === t.id);
+    if (mine && (mine.name !== t.name || mine.sport !== t.sport)) {
+      const fresh = { ...t, id: `c-${uid()}` };
+      remap[t.id] = fresh.id;
+      customs.push(fresh);
+    } else if (!mine) customs.push(t);
+    if (rawT && typeof rawT.id === 'string' && rawT.id !== t.id && !remap[rawT.id]) remap[rawT.id] = t.id;
+  }
+
+  const total = showData.scenes.reduce((n, sc) => n + (sc && Array.isArray(sc.items) ? sc.items.length : 0), 0);
+  showData.scenes.forEach(sc => {
+    if (sc && Array.isArray(sc.items)) sc.items.forEach(it => { if (it && remap[it.tech]) it.tech = remap[it.tech]; });
+  });
+  const show = sanitizeShow(showData, { fresh: true });
+  const known = new Set([...TECHNIQUES.map(t => t.id), ...state.custom.map(t => t.id), ...customs.map(t => t.id)]);
+  show.scenes.forEach(sc => { sc.items = sc.items.filter(it => known.has(it.tech)); });
+  const kept = show.scenes.reduce((n, sc) => n + sc.items.length, 0);
+
   update(st => {
-    for (const t of customs) {
-      if (!techById(t.id)) st.custom.push(t);
-    }
-    show.id = uid();
-    show.scenes.forEach(sc => { sc.items = sc.items.filter(it => techById(it.tech)); });
-    if (st.shows.some(s => s.name === show.name)) show.name += ' (kopie)';
+    st.custom.push(...customs);
+    show.name = freeName(show.name);
     show.updated = Date.now();
     st.shows.push(show);
     st.activeShow = show.id;
   });
-  return show;
+  return { show, dropped: Math.max(0, total - kept) };
 }
 
 // Vorige app: { name, duos: [{ techniques: [{ techniqueId }], notes: [{ text }] }] }
 function fromLegacy(d) {
+  const byName = name => TECHNIQUES.find(t => t.name.toLowerCase() === String(name).toLowerCase());
   return {
     name: d.name,
     scenes: d.duos.map((duo, i) => ({
       pair: PAIRS[i % PAIRS.length],
-      note: (Array.isArray(duo.notes) ? duo.notes : []).map(n => n && n.text).filter(Boolean).join('\n'),
-      items: (Array.isArray(duo.techniques) ? duo.techniques : []).map((t, j) => ({ tech: t && t.techniqueId, thrower: j % 2 })),
+      note: (Array.isArray(duo && duo.notes) ? duo.notes : []).map(n => n && n.text).filter(t => typeof t === 'string' && t).join('\n'),
+      items: (Array.isArray(duo && duo.techniques) ? duo.techniques : []).map((t, j) => {
+        const id = t && t.techniqueId != null ? String(t.techniqueId) : '';
+        const hit = TECHNIQUES.find(x => x.id === id) || byName(id);
+        return { tech: hit ? hit.id : id, thrower: j % 2 };
+      }),
     })),
   };
 }
 
-const b64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const b64url = bytes => {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
 const fromB64url = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 
 async function pipe(bytes, stream) {
@@ -243,6 +306,12 @@ export async function decodeShare(code) {
   if (kind === 'z') bytes = await pipe(bytes, new DecompressionStream('deflate-raw'));
   else if (kind !== 'p') throw new Error('Onbekende link');
   return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+// Haal de code uit een geplakte deel-link (of uit alleen de code).
+export function shareCodeFrom(text) {
+  const m = String(text || '').trim().match(/(?:#deel=)?([zp][\w-]{10,})\s*$/);
+  return m ? m[1] : null;
 }
 
 // Pas laden als alle hulpfuncties hierboven bestaan.
