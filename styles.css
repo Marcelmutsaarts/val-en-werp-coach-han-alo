@@ -109,7 +109,7 @@ button { cursor: pointer; }
 /* minmax(0, 1fr): voorkomt dat brede inhoud (zoals een rij filterknoppen) de pagina breder maakt dan het scherm */
 .grid, .stack, .lib, .lib-tools, .choreo-grid, .choreo-main { grid-template-columns: minmax(0, 1fr); }
 .grid { display: grid; gap: 16px; }
-.grid + .card, .card + .card, .grid + .grid, .card + .grid { margin-top: 16px; }
+.page > .grid + .card, .page > .card + .card, .page > .grid + .grid, .page > .card + .grid, .page > .grid + details, .page > .card + details { margin-top: 16px; }
 .grid.tight { gap: 12px; }
 .stack { display: grid; gap: 16px; align-content: start; }
 @media (min-width: 760px) {
@@ -391,7 +391,7 @@ dialog.dlg-full { width: 100vw; height: 100vh; height: 100dvh; max-height: none;
 .toast.show { opacity: 1; }
 .toast.has-action { pointer-events: auto; }
 .toast-action { margin-left: 10px; padding: 6px 10px; min-height: 36px; border: 1.5px solid #fff; border-radius: 8px; background: transparent; color: #fff; font-weight: 800; }
-dialog .toast { bottom: calc(80px + env(safe-area-inset-bottom)); }
+dialog .toast { bottom: calc(104px + env(safe-area-inset-bottom)); }
 @media (min-width: 900px) { .toast { bottom: 28px; } }
 
 /* ---------- Mijn show ---------- */
