@@ -1,5 +1,7 @@
 // Opstart, navigatie en de centrale afhandeling van klikken en invoer.
-import { subscribe, flush, decodeShare, importPacked } from './store.js';
+import { subscribe, save, flush, decodeShare, importPacked } from './store.js';
+// Los ingelezen: zo breekt een oudere store.js uit de offline-cache de app niet
+import * as store from './store.js';
 import { icon, actions, inputs, refreshParts, focusKey, restoreFocus, confirmDialog, toast } from './ui.js';
 import { viewToets, viewValbreken, viewSporten, viewTechnieken } from './views.js';
 import { viewChoreo, autoGrow } from './choreo.js';
@@ -66,11 +68,14 @@ function go() {
   }
 }
 
-// Een gedeelde show komt binnen via #deel=...
-async function handleShareLink() {
+// Een gedeelde show komt binnen via #deel=... Een extra melding komt in dezelfde toast.
+async function handleShareLink(extra = '') {
   const m = location.hash.match(/^#deel=([\w-]+)$/);
   if (!m) return false;
   history.replaceState(null, '', '#choreo');
+  // Eerst Mijn show tekenen: het importeren tekent opnieuw en heeft dan een pagina nodig
+  go();
+  let msg = '';
   try {
     const data = await decodeShare(m[1]);
     const name = data && data.show && data.show.name ? data.show.name : 'deze show';
@@ -78,12 +83,12 @@ async function handleShareLink() {
       { title: 'Gedeelde show openen?', ok: 'Toevoegen', danger: false });
     if (ok) {
       const { show, dropped } = importPacked(data);
-      toast(`“${show.name}” staat nu bij Mijn show${dropped ? `. ${dropped} ${dropped === 1 ? 'techniek kon' : 'technieken konden'} niet worden overgenomen` : ''}`);
+      msg = `“${show.name}” staat nu bij Mijn show.${dropped ? ` ${dropped} ${dropped === 1 ? 'techniek kon' : 'technieken konden'} niet worden overgenomen.` : ''}`;
     }
   } catch {
-    toast('Deze deel-link werkt niet. Vraag je groepsgenoot om een nieuwe.');
+    msg = 'Deze deel-link werkt niet. Vraag je groepsgenoot om een nieuwe.';
   }
-  go();
+  if (msg || extra) toast([msg, extra].filter(Boolean).join(' '));
   return true;
 }
 
@@ -124,7 +129,16 @@ document.querySelectorAll('[data-nav]').forEach(n => n.addEventListener('click',
 }));
 
 (async () => {
-  if (!(await handleShareLink())) go();
+  // Technieken die uit de bibliotheek zijn gehaald, zijn bij het laden uit de shows verwijderd
+  const gone = store.takeDropped ? store.takeDropped() : 0;
+  if (gone) save();
+  const note = gone
+    ? `${gone === 1 ? '1 techniek uit je show staat' : `${gone} technieken uit je show staan`} niet meer in de bibliotheek en ${gone === 1 ? 'is' : 'zijn'} weggehaald. De toetscheck laat zien wat er nu mist.`
+    : '';
+  if (!(await handleShareLink(note))) {
+    go();
+    if (note) toast(note);
+  }
 })();
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {

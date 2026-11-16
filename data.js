@@ -65,6 +65,8 @@ export const SPORTEN = {
 };
 
 // [id, naam, sport, valrichting, niveau, video]
+// Weggehaald: t26 (Duck under to takedown) en t27 (Hammerlock), want hun video liet geen valtechniek zien,
+// en t36 (Scissor roll / kani-basami), want die is te gevaarlijk.
 const T = [
   ['t1', 'O soto gari', 'judo', 'achterwaarts', 'laag', 'https://www.youtube.com/watch?v=KeIPk8O58zs'],
   ['t2', 'O uchi gari', 'judo', 'achterwaarts', 'laag', 'https://www.youtube.com/watch?v=I3BWf1ZoIuc'],
@@ -91,8 +93,6 @@ const T = [
   ['t23', 'Uki goshi', 'judo', 'voorwaarts', 'laag', 'https://youtu.be/5jVF6r366Kg'],
   ['t24', 'Snap down', 'wrestling', 'voorwaarts', 'laag', 'https://youtu.be/Jp96eJudDxQ'],
   ['t25', 'Headlock takeover', 'wwe', 'voorwaarts', 'laag', 'https://youtu.be/y8aEudoaZm0'],
-  ['t26', 'Duck under to takedown', 'wwe', 'voorwaarts', 'laag', 'https://youtu.be/wTIbkWnK-nw'],
-  ['t27', 'Hammerlock', 'wwe', 'voorwaarts', 'laag', 'https://youtu.be/i2LzI2m00lU'],
   ['t28', 'Snap takedown', 'jiujitsu', 'voorwaarts', 'laag', 'https://youtu.be/DxX3mvbM3tE'],
   ['t29', 'Ippon seoi nage', 'judo', 'voorwaarts', 'hoog', 'https://www.youtube.com/watch?v=OmKfUXAAdZ0'],
   ['t30', 'Kote gaeshi', 'aikido', 'voorwaarts', 'hoog', 'https://youtu.be/ll1GCzl4Bxg'],
@@ -101,7 +101,6 @@ const T = [
   ['t33', 'Sunset flip', 'wwe', 'voorwaarts', 'hoog', 'https://youtu.be/YL04EGORU5w'],
   ['t34', 'Clothesline', 'wwe', 'voorwaarts', 'hoog', 'https://youtu.be/yVBSU_hBoQQ'],
   ['t35', 'Shiho nage (variatie)', 'jiujitsu', 'voorwaarts', 'hoog', 'https://youtu.be/33mEgh5O4NM'],
-  ['t36', 'Scissor roll (kani-basami)', 'bjj', 'voorwaarts', 'uitdagend', 'https://youtu.be/YncIOGDSps0'],
   ['t37', 'Two sleeve suplex', 'bjj', 'voorwaarts', 'uitdagend', 'https://youtu.be/Q0n9__dQYU8'],
   ['t38', 'Key lock roll', 'wrestling', 'voorwaarts', 'uitdagend', 'https://youtu.be/NExqwHV41j0'],
   ['t39', 'Tomoe nage (opofferworp)', 'judo', 'voorwaarts', 'uitdagend', 'https://youtu.be/880WbHvHv6A'],
@@ -121,7 +120,7 @@ const T = [
 // Laag en hoog volgen gewoon het niveau.
 const UITDAGEND_HOOGTE = {
   t16: 'laag', t17: 'laag', t18: 'laag', t19: 'laag', t38: 'laag',
-  t20: 'hoog', t21: 'hoog', t36: 'hoog', t37: 'hoog', t39: 'hoog', t40: 'hoog', t48: 'hoog', t49: 'hoog',
+  t20: 'hoog', t21: 'hoog', t37: 'hoog', t39: 'hoog', t40: 'hoog', t48: 'hoog', t49: 'hoog',
 };
 
 export const TECHNIQUES = T.map(([id, name, sport, dir, level, video]) => ({

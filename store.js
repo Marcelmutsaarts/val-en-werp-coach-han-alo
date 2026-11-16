@@ -195,8 +195,24 @@ function sanitizeState(d) {
     for (const [k, v] of Object.entries(d.techNotes)) if (ids.has(k) && typeof v === 'string' && v) s.techNotes[k] = v.slice(0, 2000);
   }
   s.shows = (Array.isArray(d.shows) ? d.shows : []).map(x => sanitizeShow(x)).filter(Boolean);
+  // Een techniek die uit de bibliotheek is gehaald, verdwijnt ook uit de shows
+  for (const show of s.shows) {
+    for (const sc of show.scenes) {
+      const kept = sc.items.filter(it => ids.has(it.tech));
+      dropped += sc.items.length - kept.length;
+      sc.items = kept;
+    }
+  }
   s.activeShow = okId(d.activeShow) ? d.activeShow : null;
   return s;
+}
+
+// Hoeveel technieken er bij het laden uit de shows zijn gehaald (één keer uitlezen).
+let dropped = 0;
+export function takeDropped() {
+  const n = dropped;
+  dropped = 0;
+  return n;
 }
 
 // ---------- Delen: bestand en link ----------
