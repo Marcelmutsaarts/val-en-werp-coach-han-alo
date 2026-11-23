@@ -6,6 +6,9 @@ const KEY = 'val-werp-coach:v1';
 // Volgorde van de zes duo's: binnen elk blok van twee zijn de duo's verschillend,
 // zodat niemand twee scènes direct na elkaar hoeft te spelen.
 export const PAIRS = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
+// Groep van vijf: tien duo's, zo geordend dat niemand twee scènes direct na elkaar speelt.
+export const PAIRS5 = [[0, 1], [2, 3], [0, 4], [1, 2], [3, 4], [0, 2], [1, 3], [2, 4], [0, 3], [1, 4]];
+export const pairsFor = show => (show.members.length >= 5 ? PAIRS5 : PAIRS);
 
 export const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
 
@@ -119,7 +122,7 @@ export function activeShow() {
 
 export function memberName(show, i) {
   const n = (show.members[i] || '').trim();
-  return n || `Student ${'ABCD'[i]}`;
+  return n || `Student ${'ABCDE'[i]}`;
 }
 
 // ---------- Validatie (ook voor geïmporteerde bestanden en deel-links) ----------
@@ -156,7 +159,9 @@ export function safeUrl(u) {
 export function sanitizeShow(s, { fresh = false } = {}) {
   if (!s || typeof s !== 'object') return null;
   const members = Array.isArray(s.members) ? s.members : [];
-  const validPair = p => Array.isArray(p) && p.length === 2 && p.every(i => Number.isInteger(i) && i >= 0 && i < 4) && p[0] !== p[1];
+  // Een groep heeft vier of vijf leden
+  const size = members.length >= 5 ? 5 : 4;
+  const validPair = p => Array.isArray(p) && p.length === 2 && p.every(i => Number.isInteger(i) && i >= 0 && i < size) && p[0] !== p[1];
   const id = v => (!fresh && okId(v) ? v : uid());
   const scenes = (Array.isArray(s.scenes) ? s.scenes : []).slice(0, 40).filter(sc => sc && typeof sc === 'object').map(sc => {
     const pair = validPair(sc.pair) ? [sc.pair[0], sc.pair[1]] : null;
@@ -175,7 +180,7 @@ export function sanitizeShow(s, { fresh = false } = {}) {
   return {
     id: id(s.id),
     name: str(s.name, 80).trim() || 'Show',
-    members: [0, 1, 2, 3].map(i => str(members[i], 40)),
+    members: Array.from({ length: size }, (_, i) => str(members[i], 40)),
     theme: str(s.theme, 200),
     music: str(s.music, 200),
     costume: str(s.costume, 200),

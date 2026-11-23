@@ -1,7 +1,7 @@
-// Mijn show: viertal, zes duo's, technieken met rollen, toetscheck, uitvalcheck, oefenmodus en delen.
+// Mijn show: groep van vier of vijf, alle duo's, technieken met rollen, toetscheck, uitvalcheck, oefenmodus en delen.
 import { SPORTS } from './data.js';
 import {
-  state, update, save, rerender, PAIRS, uid, newShow, activeShow, memberName, techById, sportById, levelById, dirById,
+  state, update, save, rerender, PAIRS5, pairsFor, uid, newShow, activeShow, memberName, techById, sportById, levelById, dirById,
   packShow, importPacked, encodeShare, decodeShare, shareCodeFrom,
 } from './store.js';
 import {
@@ -27,12 +27,12 @@ export function analyze(show, absent = null) {
   const scenes = show.scenes.filter(sc => !out(sc));
   const used = scenes.flatMap(sc => (sc.pair ? sc.items.map(it => ({ t: techById(it.tech), sc, it })) : [])).filter(x => x.t);
 
-  const pairs = PAIRS.filter(p => !p.includes(absent)).map(p => {
+  const pairs = pairsFor(show).filter(p => !p.includes(absent)).map(p => {
     const n = new Set(used.filter(x => pairKey(x.sc.pair) === pairKey(p)).map(x => x.t.id)).size;
     return { p, n, ok: n >= 2 };
   });
   const sports = SPORTS.map(s => ({ s, ok: used.some(x => x.t.sport === s.id) }));
-  const roles = [0, 1, 2, 3].filter(m => m !== absent).map(m => {
+  const roles = show.members.map((_, m) => m).filter(m => m !== absent).map(m => {
     const r = { valLaag: false, valHoog: false, werpLaag: false, werpHoog: false };
     for (const { t, sc, it } of used) {
       const hoog = (t.height || t.level) === 'hoog';
@@ -99,7 +99,7 @@ function checksBody(show) {
       <h3>Als iemand uitvalt</h3>
       <div class="chips wrap" role="group" aria-label="Kies wie uitvalt">
         <button type="button" class="chip ${ui.absent == null ? 'on' : ''}" aria-pressed="${ui.absent == null}" data-action="absent" data-i="">Niemand</button>
-        ${[0, 1, 2, 3].map(i => `<button type="button" class="chip ${ui.absent === i ? 'on' : ''}" aria-pressed="${ui.absent === i}" data-action="absent" data-i="${i}">${who(show, i)}</button>`).join('')}
+        ${show.members.map((_, i) => `<button type="button" class="chip ${ui.absent === i ? 'on' : ''}" aria-pressed="${ui.absent === i}" data-action="absent" data-i="${i}">${who(show, i)}</button>`).join('')}
       </div>
       ${uitval}
     </section>
@@ -131,10 +131,10 @@ function emptyView() {
     <header class="page-head">
       <p class="eyebrow">Mijn show</p>
       <h1>Bouw je show</h1>
-      <p class="lead">Plan je show met je viertal: wie doet wat, in welke volgorde, en klopt alles met de toetseisen?</p>
+      <p class="lead">Plan je show met je groep: wie doet wat, in welke volgorde, en klopt alles met de toetseisen?</p>
     </header>
     <ol class="steps">
-      <li><span><b>Vul je viertal in.</b> De app maakt meteen de zes duo’s.</span></li>
+      <li><span><b>Vul je groep in.</b> Vier namen, of vijf als jullie met vijf zijn. De app maakt meteen de duo’s.</span></li>
       <li><span><b>Kies per duo twee technieken.</b> Geef aan wie werpt en wie valt.</span></li>
       <li><span><b>Check, oefen en deel.</b> De toetscheck laat zien wat nog ontbreekt. Met de oefenmodus loop je de show door in de zaal.</span></li>
     </ol>
@@ -172,12 +172,14 @@ function setupCard(show) {
       </span>
       ${icon('down', 'chev')}
     </summary>
-    <div class="members">
-      ${[0, 1, 2, 3].map(i => `
-        <label class="member"><span class="badge">${'ABCD'[i]}</span>
-          <input type="text" maxlength="40" autocomplete="off" placeholder="Naam ${i + 1}" value="${esc(show.members[i])}" data-input="member" data-i="${i}" aria-label="Naam groepslid ${'ABCD'[i]}">
-        </label>`).join('')}
+    <div class="members ${show.members.length > 4 ? 'five' : ''}">
+      ${show.members.map((_, i) => `
+        <${i > 3 ? 'div' : 'label'} class="member"><span class="badge">${'ABCDE'[i]}</span>
+          <input type="text" maxlength="40" autocomplete="off" placeholder="Naam ${i + 1}" value="${esc(show.members[i])}" data-input="member" data-i="${i}" aria-label="Naam groepslid ${'ABCDE'[i]}">
+          ${i > 3 ? `<button type="button" class="icon-btn sm" data-action="member-remove" aria-label="Verwijder groepslid E">${icon('x')}</button>` : ''}
+        </${i > 3 ? 'div' : 'label'}>`).join('')}
     </div>
+    ${show.members.length < 5 ? `<button type="button" class="btn btn-ghost btn-sm member-add" data-action="member-add">${icon('plus')} Vijfde groepslid toevoegen</button>` : ''}
     <div class="grid cols-2 tight">
       ${field('theme', 'Thema of verhaal', 'Bijvoorbeeld: western, superhelden, ninja’s')}
       ${field('music', 'Muziek', 'Nummer(s) en wanneer de muziek wisselt')}
@@ -263,7 +265,7 @@ export function viewChoreo() {
   const show = activeShow();
   if (!show) return emptyView();
   if (state.activeShow !== show.id) state.activeShow = show.id;
-  if (ui.absent != null && ui.absent > 3) ui.absent = null;
+  if (ui.absent != null && ui.absent >= show.members.length) ui.absent = null;
   const switcher = state.shows.length > 1
     ? `<label class="show-switch"><span class="sr">Kies een show</span>
         <select data-input="show-switch">${state.shows.map(s => `<option value="${esc(s.id)}" ${s.id === show.id ? 'selected' : ''}>${esc(s.name)} · ${new Date(s.updated).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}</option>`).join('')}</select>
@@ -637,7 +639,7 @@ function printShow(show) {
       <p class="doc-kicker">Val &amp; Werp Coach · HAN ALO · Van staand naar de grond</p>
       <h1>${esc(show.name)}</h1>
       <table class="doc-meta">
-        <tr><th>Groep</th><td>${show.members.map((m, i) => `${'ABCD'[i]}. ${esc(memberName(show, i))}`).join('&nbsp;&nbsp; ')}</td></tr>
+        <tr><th>Groep</th><td>${show.members.map((m, i) => `${'ABCDE'[i]}.${esc(memberName(show, i))}`).join('&nbsp;&nbsp; ')}</td></tr>
         ${row('Thema', show.theme)}${row('Muziek', show.music)}${row('Kleding', show.costume)}${row('Regie', show.direction)}
       </table>
       <h2>Scènes</h2>
@@ -777,6 +779,40 @@ Object.assign(actions, {
       .catch(e => { if (e && e.name !== 'AbortError') toast('Delen lukte niet. Kopieer de link.'); });
   }),
 
+  // Groep van vijf: er komen vier duo's bij (ieder met het vijfde groepslid)
+  'member-add': withShow(show => {
+    if (show.members.length >= 5) return;
+    const scene = pair => ({ id: uid(), pair: [...pair], title: '', note: '', items: [] });
+    const untouched = show.scenes.every(sc => sc.pair && !sc.items.length && !sc.title && !sc.note);
+    ui.setupOpen = true;
+    update(() => {
+      show.members.push('');
+      // Nog niets ingevuld: meteen de handigste volgorde. Anders de nieuwe duo's achteraan.
+      if (untouched) show.scenes = PAIRS5.map(scene);
+      else [0, 1, 2, 3].forEach(i => show.scenes.push(scene([i, 4])));
+      touch(show);
+    });
+    requestAnimationFrame(() => document.querySelector('[data-input="member"][data-i="4"]')?.focus());
+    toast('Vijfde groepslid toegevoegd: er zijn nu tien duo’s');
+  }),
+
+  'member-remove': withShow(async show => {
+    if (show.members.length < 5) return;
+    const mine = show.scenes.filter(sc => sc.pair && sc.pair.includes(4));
+    const filled = mine.filter(sc => sc.items.length || sc.title || sc.note).length;
+    if (filled) {
+      const ok = await confirmDialog(`${memberName(show, 4)} en ${filled} ingevulde ${filled === 1 ? 'scène' : 'scènes'} met dit groepslid worden verwijderd.`, { title: 'Groepslid verwijderen?' });
+      if (!ok) return;
+    }
+    if (ui.absent === 4) ui.absent = null;
+    ui.setupOpen = true;
+    update(() => {
+      show.scenes = show.scenes.filter(sc => !mine.includes(sc));
+      show.members.length = 4;
+      touch(show);
+    });
+  }),
+
   rehearse: withShow(show => openRehearsal(show)),
 
   'checks-open': withShow(() => {
@@ -795,12 +831,12 @@ Object.assign(actions, {
       title: 'Scène toevoegen',
       className: 'dlg-small',
       body: `<div class="menu">
-        ${PAIRS.map((p, i) => `<button type="button" data-pair="${i}">${icon('users')} ${pairLabel(show, p)}</button>`).join('')}
+        ${pairsFor(show).map((p, i) => `<button type="button" data-pair="${i}">${icon('users')} ${pairLabel(show, p)}</button>`).join('')}
         <button type="button" data-pair="group">${icon('users')} Hele groep <small>opening, overgang of slot</small></button>
       </div>`,
     });
     d.querySelectorAll('[data-pair]').forEach(b => b.addEventListener('click', () => {
-      const pair = b.dataset.pair === 'group' ? null : [...PAIRS[Number(b.dataset.pair)]];
+      const pair = b.dataset.pair === 'group' ? null : [...pairsFor(show)[Number(b.dataset.pair)]];
       const sc = { id: uid(), pair, title: '', note: '', items: [] };
       update(() => { show.scenes.push(sc); touch(show); });
       d.close();
