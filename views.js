@@ -1,6 +1,6 @@
 // Tabbladen Toets, Valbreken, Sporten en Technieken, plus de gedeelde techniekenlijst met filters.
 import { TOETS, FASES, VALBREKEN, SPORTS, SPORTEN, TECHNIEKEN, LEVELS, DIRECTIONS } from './data.js';
-import { state, update, save, allTechniques, techById, sportById, levelById, dirById, sanitizeTechnique, uid } from './store.js';
+import { state, update, save, allTechniques, techById, sportById, levelById, dirById, sanitizeTechnique, uid, NO_SPORT } from './store.js';
 import { esc, icon, actions, inputs, parts, refreshParts, openDialog, confirmDialog, openVideo, toast, levelBars } from './ui.js';
 
 const pageHead = (eyebrow, title, lead) => `
@@ -300,7 +300,8 @@ function customForm(t) {
   <form class="stack" data-custom-form>
     <label class="field"><span>Naam van de techniek</span><input name="name" type="text" maxlength="120" required value="${esc(t.name)}" placeholder="Bijvoorbeeld: Hip toss"></label>
     <label class="field"><span>Sportprofiel</span>
-      <select name="sport">${SPORTS.map(s => `<option value="${s.id}" ${s.id === t.sport ? 'selected' : ''}>${esc(s.title)}</option>`).join('')}</select>
+      <select name="sport">${SPORTS.map(s => `<option value="${s.id}" ${s.id === t.sport ? 'selected' : ''}>${esc(s.title)}</option>`).join('')}
+        <option value="${NO_SPORT.id}" ${t.sport === NO_SPORT.id ? 'selected' : ''}>${esc(NO_SPORT.title)}</option></select>
     </label>
     <fieldset class="field"><legend>Valrichting</legend><div class="seg">${radios('dir', DIRECTIONS, t.dir)}</div></fieldset>
     <fieldset class="field"><legend>Niveau</legend><div class="seg">${radios('level', LEVELS, t.level)}</div></fieldset>

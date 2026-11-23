@@ -96,7 +96,9 @@ export function techById(id) {
   return TECHNIQUES.find(t => t.id === id) || state.custom.find(t => t.id === id) || null;
 }
 
-export const sportById = id => SPORTS.find(s => s.id === id);
+// Een eigen techniek hoeft niet bij een sportprofiel te horen; die telt dan voor geen enkel profiel mee.
+export const NO_SPORT = { id: 'nvt', name: 'Zelf bedacht', title: 'N.v.t. (zelf bedacht)' };
+export const sportById = id => SPORTS.find(s => s.id === id) || (id === NO_SPORT.id ? NO_SPORT : undefined);
 export const levelById = id => LEVELS.find(l => l.id === id) || LEVELS[0];
 export const dirById = id => DIRECTIONS.find(d => d.id === id) || DIRECTIONS[0];
 
@@ -137,7 +139,7 @@ export function sanitizeTechnique(t) {
   return {
     id: typeof t.id === 'string' && CUSTOM_RE.test(t.id) ? t.id : `c-${uid()}`,
     name,
-    sport: SPORTS.some(s => s.id === t.sport) ? t.sport : SPORTS[0].id,
+    sport: t.sport === NO_SPORT.id || SPORTS.some(s => s.id === t.sport) ? t.sport : SPORTS[0].id,
     dir: DIRECTIONS.some(d => d.id === t.dir) ? t.dir : DIRECTIONS[0].id,
     level,
     height: level === 'uitdagend' ? (t.height === 'laag' ? 'laag' : 'hoog') : level,
