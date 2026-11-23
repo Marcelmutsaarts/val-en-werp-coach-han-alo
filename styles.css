@@ -424,6 +424,7 @@ details.setup[open] summary { margin-bottom: 14px; }
 .members { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
 @media (min-width: 640px) { .members { grid-template-columns: repeat(4, 1fr); } .members.five { grid-template-columns: repeat(3, 1fr); } }
 .member-add { margin: -4px 0 14px; }
+.pick-own { margin-bottom: 12px; }
 .member { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 6px; border: 1.5px solid var(--line-2); border-radius: var(--radius-sm); background: #fff; min-width: 0; }
 .member:focus-within { border-color: var(--ink); box-shadow: 0 0 0 3px var(--accent-soft); }
 .member input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px; padding: 8px 4px; }

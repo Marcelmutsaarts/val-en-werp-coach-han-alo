@@ -317,6 +317,7 @@ function openPicker(show, sc) {
         ${searchBox('pick')}
         <div data-part="filters" data-scope="pick">${parts.filters({ scope: 'pick' })}</div>
       </div>
+      <button type="button" class="btn btn-ghost btn-block pick-own" data-action="custom-new" data-scene="${esc(sc.id)}">${icon('plus')} Eigen techniek toevoegen</button>
       <div data-part="techlist" data-scope="pick" data-scene="${esc(sc.id)}">${parts.techlist({ scope: 'pick', scene: sc.id })}</div>`,
     footer: '<button type="button" class="btn btn-primary btn-block" data-dlg-close>Klaar</button>',
   });

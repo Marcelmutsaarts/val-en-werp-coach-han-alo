@@ -307,17 +307,18 @@ function customForm(t) {
     <fieldset class="field" data-height ${t.level === 'uitdagend' ? '' : 'hidden'}><legend>Valhoogte <i>(voor de toetscheck)</i></legend>
       <div class="seg">${radios('height', [{ id: 'laag', name: 'Laag' }, { id: 'hoog', name: 'Hoog' }], t.height === 'laag' ? 'laag' : 'hoog')}</div>
     </fieldset>
-    <label class="field"><span>YouTube-link <i>(optioneel)</i></span><input name="video" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${esc(t.video)}"></label>
+    <label class="field"><span>Link naar een filmpje <i>(optioneel)</i></span><input name="video" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${esc(t.video)}"></label>
   </form>`;
 }
 
-function openCustomDialog(existing) {
-  const t = existing || { name: '', sport: filters.lib.sport || SPORTS[0].id, dir: DIRECTIONS[0].id, level: LEVELS[0].id, video: '' };
+// scene: de techniek komt uit de kiezer van Mijn show en gaat na het opslaan meteen in die scène.
+function openCustomDialog(existing, scene = '') {
+  const t = existing || { name: '', sport: filters[scene ? 'pick' : 'lib'].sport || SPORTS[0].id, dir: DIRECTIONS[0].id, level: LEVELS[0].id, video: '' };
   const d = openDialog({
     title: existing ? 'Techniek wijzigen' : 'Eigen techniek toevoegen',
     body: customForm(t),
     footer: `<button type="button" class="btn btn-ghost" data-dlg-close>Annuleren</button>
-             <button type="button" class="btn btn-primary" data-save>Opslaan</button>`,
+             <button type="button" class="btn btn-primary" data-save>${scene ? 'Toevoegen aan scène' : 'Opslaan'}</button>`,
   });
   const form = d.querySelector('form');
   // Valhoogte alleen vragen bij uitdagende technieken
@@ -336,6 +337,8 @@ function openCustomDialog(existing) {
     });
     openTech = clean.id;
     d.close();
+    // Vanuit de kiezer: direct in de scène zetten (de kiezer meldt zelf dat het gelukt is)
+    if (scene && !existing) { actions.pick({ dataset: { id: clean.id, scene } }); return; }
     toast(existing ? 'Techniek bijgewerkt' : 'Techniek toegevoegd');
   };
   d.querySelector('[data-save]').addEventListener('click', submit);
@@ -385,7 +388,7 @@ Object.assign(actions, {
     });
   },
 
-  'custom-new': () => openCustomDialog(null),
+  'custom-new': el => openCustomDialog(null, el.dataset.scene || ''),
   'custom-edit': el => openCustomDialog(techById(el.dataset.id)),
 
   'custom-delete': async el => {

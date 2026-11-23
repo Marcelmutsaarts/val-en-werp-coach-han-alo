@@ -212,7 +212,7 @@ export function openVideo(url, title) {
     title,
     className: 'dlg-video',
     body: `${frame}
-      <a class="btn btn-ghost btn-block" href="${esc(url)}" target="_blank" rel="noopener">${icon('external')} Open op YouTube</a>`,
+      <a class="btn btn-ghost btn-block" href="${esc(url)}" target="_blank" rel="noopener">${icon('external')} ${id ? 'Open op YouTube' : 'Open het filmpje'}</a>`,
   });
 }
 
