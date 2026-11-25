@@ -1,6 +1,6 @@
 // Tabbladen Toets, Valbreken, Sporten en Technieken, plus de gedeelde techniekenlijst met filters.
 import { TOETS, FASES, VALBREKEN, SPORTS, SPORTEN, TECHNIEKEN, LEVELS, DIRECTIONS } from './data.js';
-import { state, update, save, allTechniques, techById, sportById, levelById, dirById, sanitizeTechnique, uid } from './store.js';
+import { state, update, save, allTechniques, techById, sportById, levelById, dirById, sanitizeTechnique, uid, NO_SPORT } from './store.js';
 import { esc, icon, actions, inputs, parts, refreshParts, openDialog, confirmDialog, openVideo, toast, levelBars } from './ui.js';
 
 const pageHead = (eyebrow, title, lead) => `
@@ -21,10 +21,10 @@ export function viewToets() {
       <h1>${esc(TOETS.title)}</h1>
       <p class="lead">${esc(TOETS.intro)}</p>
       <ul class="facts">
-        <li><b>4 of 6</b><span>studenten per groep</span></li>
+        <li><b>4</b><span>studenten per groep</span></li>
+        <li><b>6</b><span>duo’s per groep</span></li>
         <li><b>2</b><span>technieken per duo</span></li>
         <li><b>6</b><span>sportprofielen in de show</span></li>
-        <li><b>3</b><span>valrichtingen in de show</span></li>
       </ul>
       <a class="btn btn-primary" href="#choreo">Werk aan je show ${icon('arrow')}</a>
     </header>
@@ -36,7 +36,6 @@ export function viewToets() {
         <div class="pairs-demo">
           ${pairs.map(p => `<span>${p}</span>`).join('')}
         </div>
-        <p>${esc(TOETS.zestal)}</p>
         <h3>De uitvoering bevat</h3>
         <ul class="checks">${TOETS.bevat.map(b => `<li>${icon('check')}<span>${esc(b)}</span></li>`).join('')}</ul>
         <h3>Je laat zien</h3>
@@ -301,24 +300,26 @@ function customForm(t) {
   <form class="stack" data-custom-form>
     <label class="field"><span>Naam van de techniek</span><input name="name" type="text" maxlength="120" required value="${esc(t.name)}" placeholder="Bijvoorbeeld: Hip toss"></label>
     <label class="field"><span>Sportprofiel</span>
-      <select name="sport">${SPORTS.map(s => `<option value="${s.id}" ${s.id === t.sport ? 'selected' : ''}>${esc(s.title)}</option>`).join('')}</select>
+      <select name="sport">${SPORTS.map(s => `<option value="${s.id}" ${s.id === t.sport ? 'selected' : ''}>${esc(s.title)}</option>`).join('')}
+        <option value="${NO_SPORT.id}" ${t.sport === NO_SPORT.id ? 'selected' : ''}>${esc(NO_SPORT.title)}</option></select>
     </label>
     <fieldset class="field"><legend>Valrichting</legend><div class="seg">${radios('dir', DIRECTIONS, t.dir)}</div></fieldset>
     <fieldset class="field"><legend>Niveau</legend><div class="seg">${radios('level', LEVELS, t.level)}</div></fieldset>
     <fieldset class="field" data-height ${t.level === 'uitdagend' ? '' : 'hidden'}><legend>Valhoogte <i>(voor de toetscheck)</i></legend>
       <div class="seg">${radios('height', [{ id: 'laag', name: 'Laag' }, { id: 'hoog', name: 'Hoog' }], t.height === 'laag' ? 'laag' : 'hoog')}</div>
     </fieldset>
-    <label class="field"><span>YouTube-link <i>(optioneel)</i></span><input name="video" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${esc(t.video)}"></label>
+    <label class="field"><span>Link naar een filmpje <i>(optioneel)</i></span><input name="video" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${esc(t.video)}"></label>
   </form>`;
 }
 
-function openCustomDialog(existing) {
-  const t = existing || { name: '', sport: filters.lib.sport || SPORTS[0].id, dir: DIRECTIONS[0].id, level: LEVELS[0].id, video: '' };
+// scene: de techniek komt uit de kiezer van Mijn show en gaat na het opslaan meteen in die scène.
+function openCustomDialog(existing, scene = '') {
+  const t = existing || { name: '', sport: filters[scene ? 'pick' : 'lib'].sport || SPORTS[0].id, dir: DIRECTIONS[0].id, level: LEVELS[0].id, video: '' };
   const d = openDialog({
     title: existing ? 'Techniek wijzigen' : 'Eigen techniek toevoegen',
     body: customForm(t),
     footer: `<button type="button" class="btn btn-ghost" data-dlg-close>Annuleren</button>
-             <button type="button" class="btn btn-primary" data-save>Opslaan</button>`,
+             <button type="button" class="btn btn-primary" data-save>${scene ? 'Toevoegen aan scène' : 'Opslaan'}</button>`,
   });
   const form = d.querySelector('form');
   // Valhoogte alleen vragen bij uitdagende technieken
@@ -337,6 +338,8 @@ function openCustomDialog(existing) {
     });
     openTech = clean.id;
     d.close();
+    // Vanuit de kiezer: direct in de scène zetten (de kiezer meldt zelf dat het gelukt is)
+    if (scene && !existing) { actions.pick({ dataset: { id: clean.id, scene } }); return; }
     toast(existing ? 'Techniek bijgewerkt' : 'Techniek toegevoegd');
   };
   d.querySelector('[data-save]').addEventListener('click', submit);
@@ -386,7 +389,7 @@ Object.assign(actions, {
     });
   },
 
-  'custom-new': () => openCustomDialog(null),
+  'custom-new': el => openCustomDialog(null, el.dataset.scene || ''),
   'custom-edit': el => openCustomDialog(techById(el.dataset.id)),
 
   'custom-delete': async el => {

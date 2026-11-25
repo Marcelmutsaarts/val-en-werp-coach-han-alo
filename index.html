@@ -11,17 +11,6 @@
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css">
-  <script>
-    // Na een update kan de offline-cache heel even oude en nieuwe bestanden mengen. Start de app dan niet, dan één keer herladen.
-    addEventListener('error', e => {
-      if (!(e.error instanceof SyntaxError) || document.documentElement.dataset.started) return;
-      try {
-        if (sessionStorage.getItem('vwc-herladen')) return;
-        sessionStorage.setItem('vwc-herladen', '1');
-      } catch (err) { return; }
-      location.reload();
-    });
-  </script>
   <script type="module" src="app.js"></script>
 </head>
 <body>

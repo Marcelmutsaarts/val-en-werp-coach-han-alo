@@ -1,15 +1,15 @@
-// Mijn show: viertal of zestal, duo's, technieken met rollen, toetscheck, uitvalcheck, oefenmodus en delen.
-import { SPORTS, DIRECTIONS } from './data.js';
+// Mijn show: groep van vier of vijf, alle duo's, technieken met rollen, toetscheck, uitvalcheck, oefenmodus en delen.
+import { SPORTS } from './data.js';
 import {
-  state, update, save, rerender, PAIRS, SIZES, LETTERS, startPairs, allPairs, newScene, uid, newShow, activeShow, memberName,
-  techById, sportById, levelById, dirById, packShow, importPacked, encodeShare, decodeShare, shareCodeFrom,
+  state, update, save, rerender, PAIRS5, pairsFor, uid, newShow, activeShow, memberName, techById, sportById, levelById, dirById,
+  packShow, importPacked, encodeShare, decodeShare, shareCodeFrom,
 } from './store.js';
 import {
   esc, icon, actions, inputs, parts, refreshParts, openDialog, confirmDialog, promptDialog, openVideo, toast, download, slug,
 } from './ui.js';
 import { searchBox, setPickContext, techMeta } from './views.js';
 
-const ui = { absent: null, setupOpen: null, showId: null };
+const ui = { absent: null, setupOpen: null };
 
 const pairKey = p => `${Math.min(...p)}-${Math.max(...p)}`;
 const who = (show, i) => `<span data-member="${i}">${esc(memberName(show, i))}</span>`;
@@ -22,33 +22,17 @@ function touch(show) { show.updated = Date.now(); }
 
 // ---------- Toetscheck ----------
 
-// In een zestal kiest de groep zelf de duo's, zolang ieder met minstens zoveel groepsgenoten samenwerkt.
-const MIN_PARTNERS = 3;
-
 export function analyze(show, absent = null) {
-  const size = show.members.length;
   const out = sc => absent != null && sc.pair && sc.pair.includes(absent);
   const scenes = show.scenes.filter(sc => !out(sc));
   const used = scenes.flatMap(sc => (sc.pair ? sc.items.map(it => ({ t: techById(it.tech), sc, it })) : [])).filter(x => x.t);
-  const members = [...Array(size).keys()].filter(m => m !== absent);
 
-  // Een viertal laat alle zes duo's zien; in een zestal telt elk duo dat in de show staat
-  const duos = size === 4
-    ? PAIRS.filter(p => !p.includes(absent))
-    : [...new Map(scenes.filter(sc => sc.pair).map(sc => [pairKey(sc.pair), sc.pair])).values()];
-  const pairs = duos.map(p => {
+  const pairs = pairsFor(show).filter(p => !p.includes(absent)).map(p => {
     const n = new Set(used.filter(x => pairKey(x.sc.pair) === pairKey(p)).map(x => x.t.id)).size;
     return { p, n, ok: n >= 2 };
   });
-  // Valt iemand uit, dan verliest ieder hooguit die ene partner: één groepsgenoot minder is dan genoeg
-  const need = absent == null ? MIN_PARTNERS : MIN_PARTNERS - 1;
-  const partners = size === 4 ? [] : members.map(m => {
-    const n = new Set(used.filter(x => x.sc.pair.includes(m)).map(x => x.sc.pair.find(o => o !== m))).size;
-    return { m, n, ok: n >= need };
-  });
   const sports = SPORTS.map(s => ({ s, ok: used.some(x => x.t.sport === s.id) }));
-  const directions = DIRECTIONS.map(d => ({ d, ok: used.some(x => x.t.dir === d.id) }));
-  const roles = members.map(m => {
+  const roles = show.members.map((_, m) => m).filter(m => m !== absent).map(m => {
     const r = { valLaag: false, valHoog: false, werpLaag: false, werpHoog: false };
     for (const { t, sc, it } of used) {
       const hoog = (t.height || t.level) === 'hoog';
@@ -63,12 +47,9 @@ export function analyze(show, absent = null) {
   const score = (list, f = x => x.ok) => [list.filter(f).length, list.length];
   const roleCount = [roles.reduce((n, x) => n + Object.values(x.r).filter(Boolean).length, 0), roles.length * 4];
   return {
-    pairs, partners, sports, directions, roles, elements,
+    pairs, sports, roles, elements,
     dropped: show.scenes.filter(out),
-    totals: {
-      pairs: score(pairs), partners: score(partners), sports: score(sports), directions: score(directions),
-      roles: roleCount, elements: score(elements),
-    },
+    totals: { pairs: score(pairs), sports: score(sports), roles: roleCount, elements: score(elements) },
   };
 }
 
@@ -80,53 +61,27 @@ function checksBody(show) {
   const a = analyze(show);
   const all = Object.values(a.totals).every(([x, y]) => x === y);
   const roleCols = [['valLaag', 'Valt laag'], ['valHoog', 'Valt hoog'], ['werpLaag', 'Werpt laag'], ['werpHoog', 'Werpt hoog']];
-  const six = show.members.length === 6;
-  const marks = list => `<ul class="sport-marks">${list.map(x => `<li class="${x.ok ? 'ok' : ''}">${x.ok ? icon('check') : ''}${esc(x.name)}<span class="sr">${x.ok ? ', zit erin' : ', ontbreekt nog'}</span></li>`).join('')}</ul>`;
   let uitval = '';
   if (ui.absent != null) {
     const b = analyze(show, ui.absent);
-    const missing = [
-      ...b.sports.filter(x => !x.ok).map(x => x.s.name),
-      ...b.directions.filter(x => !x.ok).map(x => `${x.d.name.toLowerCase()} vallen`),
-    ];
+    const missing = b.sports.filter(x => !x.ok).map(x => x.s.name);
     const left = show.scenes.length - b.dropped.length;
-    const gaps = b.roles.map(x => {
-      const miss = Object.keys(ROLE_WORDS).filter(k => !x.r[k]).map(k => ROLE_WORDS[k]);
-      const p = b.partners.find(y => y.m === x.m);
-      const bits = [];
-      if (miss.length) bits.push(`laat dan niet meer zien: ${miss.join(', ')}`);
-      if (p && !p.ok) bits.push(`werkt dan nog maar met ${p.n} ${p.n === 1 ? 'groepsgenoot' : 'groepsgenoten'}`);
-      return { m: x.m, text: bits.join('; ') };
-    }).filter(x => x.text);
+    const gaps = b.roles.map(x => ({ m: x.m, miss: Object.keys(ROLE_WORDS).filter(k => !x.r[k]) })).filter(x => x.miss.length);
     uitval = `<div class="uitval-result">
       <p>Zonder <b>${esc(memberName(show, ui.absent))}</b> vallen ${b.dropped.length} scènes weg en blijven er ${left} over.
-      ${missing.length ? `Dan ontbreekt: <b>${esc(missing.join(', '))}</b>.` : 'Alle sportprofielen en valrichtingen zitten er dan nog in.'}</p>
-      ${gaps.length
-        ? `<ul>${gaps.map(x => `<li><b>${esc(memberName(show, x.m))}</b> ${x.text}</li>`).join('')}</ul>`
-        : `<p>Iedereen laat dan nog steeds laag en hoog vallen en werpen zien${six ? `, met minstens ${MIN_PARTNERS - 1} groepsgenoten` : ''}.</p>`}
+      ${missing.length ? `Dan ontbreekt: <b>${esc(missing.join(', '))}</b>.` : 'Alle sportprofielen zitten er dan nog in.'}</p>
+      ${gaps.length ? `<ul>${gaps.map(x => `<li><b>${esc(memberName(show, x.m))}</b> laat dan niet meer zien: ${x.miss.map(k => ROLE_WORDS[k]).join(', ')}</li>`).join('')}</ul>` : '<p>Iedereen laat dan nog steeds laag en hoog vallen en werpen zien.</p>'}
     </div>`;
   }
   return `
     ${all ? `<p class="all-good">${icon('check')} Alles in orde. Tijd om te oefenen!</p>` : ''}
     <section class="check-group">
       <h3>Elk duo twee technieken ${frac(a.totals.pairs)}</h3>
-      ${a.pairs.length
-        ? `<ul class="check-list">${a.pairs.map(x => `<li>${mark(x.ok)}<span>${pairLabel(show, x.p)}</span><small>${x.n}</small></li>`).join('')}</ul>`
-        : '<p class="muted">Er staan nog geen duo’s in de show.</p>'}
+      <ul class="check-list">${a.pairs.map(x => `<li>${mark(x.ok)}<span>${pairLabel(show, x.p)}</span><small>${x.n}</small></li>`).join('')}</ul>
     </section>
-    ${six ? `
-    <section class="check-group">
-      <h3>Ieder met ${MIN_PARTNERS} groepsgenoten ${frac(a.totals.partners)}</h3>
-      <ul class="check-list">${a.partners.map(x => `<li>${mark(x.ok)}<span>${who(show, x.m)}</span><small>${x.n}</small></li>`).join('')}</ul>
-      <p class="hint">In een zestal kiezen jullie zelf de duo’s. Zorg dat ieder met minstens ${MIN_PARTNERS} verschillende groepsgenoten een duo vormt.</p>
-    </section>` : ''}
     <section class="check-group">
       <h3>Alle sportprofielen ${frac(a.totals.sports)}</h3>
-      ${marks(a.sports.map(x => ({ name: x.s.name, ok: x.ok })))}
-    </section>
-    <section class="check-group">
-      <h3>Alle valrichtingen ${frac(a.totals.directions)}</h3>
-      ${marks(a.directions.map(x => ({ name: x.d.name, ok: x.ok })))}
+      <ul class="sport-marks">${a.sports.map(x => `<li class="${x.ok ? 'ok' : ''}">${x.ok ? icon('check') : ''}${esc(x.s.name)}<span class="sr">${x.ok ? ', zit erin' : ', ontbreekt nog'}</span></li>`).join('')}</ul>
     </section>
     <section class="check-group">
       <h3>Ieder laat alles zien ${frac(a.totals.roles)}</h3>
@@ -144,7 +99,7 @@ function checksBody(show) {
       <h3>Als iemand uitvalt</h3>
       <div class="chips wrap" role="group" aria-label="Kies wie uitvalt">
         <button type="button" class="chip ${ui.absent == null ? 'on' : ''}" aria-pressed="${ui.absent == null}" data-action="absent" data-i="">Niemand</button>
-        ${show.members.map((m, i) => `<button type="button" class="chip ${ui.absent === i ? 'on' : ''}" aria-pressed="${ui.absent === i}" data-action="absent" data-i="${i}">${who(show, i)}</button>`).join('')}
+        ${show.members.map((_, i) => `<button type="button" class="chip ${ui.absent === i ? 'on' : ''}" aria-pressed="${ui.absent === i}" data-action="absent" data-i="${i}">${who(show, i)}</button>`).join('')}
       </div>
       ${uitval}
     </section>
@@ -179,7 +134,7 @@ function emptyView() {
       <p class="lead">Plan je show met je groep: wie doet wat, in welke volgorde, en klopt alles met de toetseisen?</p>
     </header>
     <ol class="steps">
-      <li><span><b>Vul je viertal of zestal in.</b> De app maakt meteen de duo’s.</span></li>
+      <li><span><b>Vul je groep in.</b> Vier namen, of vijf als jullie met vijf zijn. De app maakt meteen de duo’s.</span></li>
       <li><span><b>Kies per duo twee technieken.</b> Geef aan wie werpt en wie valt.</span></li>
       <li><span><b>Check, oefen en deel.</b> De toetscheck laat zien wat nog ontbreekt. Met de oefenmodus loop je de show door in de zaal.</span></li>
     </ol>
@@ -217,15 +172,14 @@ function setupCard(show) {
       </span>
       ${icon('down', 'chev')}
     </summary>
-    <div class="size-switch" role="group" aria-label="Groepsgrootte">
-      ${SIZES.map(n => `<button type="button" class="chip ${show.members.length === n ? 'on' : ''}" aria-pressed="${show.members.length === n}" data-action="group-size" data-val="${n}">${n === 6 ? 'Zestal' : 'Viertal'}</button>`).join('')}
+    <div class="members ${show.members.length > 4 ? 'five' : ''}">
+      ${show.members.map((_, i) => `
+        <${i > 3 ? 'div' : 'label'} class="member"><span class="badge">${'ABCDE'[i]}</span>
+          <input type="text" maxlength="40" autocomplete="off" placeholder="Naam ${i + 1}" value="${esc(show.members[i])}" data-input="member" data-i="${i}" aria-label="Naam groepslid ${'ABCDE'[i]}">
+          ${i > 3 ? `<button type="button" class="icon-btn sm" data-action="member-remove" aria-label="Verwijder groepslid E">${icon('x')}</button>` : ''}
+        </${i > 3 ? 'div' : 'label'}>`).join('')}
     </div>
-    <div class="members ${show.members.length === 6 ? 'six' : ''}">
-      ${show.members.map((m, i) => `
-        <label class="member"><span class="badge">${LETTERS[i]}</span>
-          <input type="text" maxlength="40" autocomplete="off" placeholder="Naam ${i + 1}" value="${esc(m)}" data-input="member" data-i="${i}" aria-label="Naam groepslid ${LETTERS[i]}">
-        </label>`).join('')}
-    </div>
+    ${show.members.length < 5 ? `<button type="button" class="btn btn-ghost btn-sm member-add" data-action="member-add">${icon('plus')} Vijfde groepslid toevoegen</button>` : ''}
     <div class="grid cols-2 tight">
       ${field('theme', 'Thema of verhaal', 'Bijvoorbeeld: western, superhelden, ninja’s')}
       ${field('music', 'Muziek', 'Nummer(s) en wanneer de muziek wisselt')}
@@ -311,12 +265,6 @@ export function viewChoreo() {
   const show = activeShow();
   if (!show) return emptyView();
   if (state.activeShow !== show.id) state.activeShow = show.id;
-  // Een andere show (gewisseld, nieuw of geïmporteerd): weergavekeuzes van de vorige show vergeten
-  if (ui.showId !== show.id) {
-    ui.showId = show.id;
-    ui.absent = null;
-    ui.setupOpen = null;
-  }
   if (ui.absent != null && ui.absent >= show.members.length) ui.absent = null;
   const switcher = state.shows.length > 1
     ? `<label class="show-switch"><span class="sr">Kies een show</span>
@@ -369,6 +317,7 @@ function openPicker(show, sc) {
         ${searchBox('pick')}
         <div data-part="filters" data-scope="pick">${parts.filters({ scope: 'pick' })}</div>
       </div>
+      <button type="button" class="btn btn-ghost btn-block pick-own" data-action="custom-new" data-scene="${esc(sc.id)}">${icon('plus')} Eigen techniek toevoegen</button>
       <div data-part="techlist" data-scope="pick" data-scene="${esc(sc.id)}">${parts.techlist({ scope: 'pick', scene: sc.id })}</div>`,
     footer: '<button type="button" class="btn btn-primary btn-block" data-dlg-close>Klaar</button>',
   });
@@ -691,7 +640,7 @@ function printShow(show) {
       <p class="doc-kicker">Val &amp; Werp Coach · HAN ALO · Van staand naar de grond</p>
       <h1>${esc(show.name)}</h1>
       <table class="doc-meta">
-        <tr><th>Groep</th><td>${show.members.map((m, i) => `${LETTERS[i]}. ${esc(memberName(show, i))}`).join('&nbsp;&nbsp; ')}</td></tr>
+        <tr><th>Groep</th><td>${show.members.map((m, i) => `${'ABCDE'[i]}.${esc(memberName(show, i))}`).join('&nbsp;&nbsp; ')}</td></tr>
         ${row('Thema', show.theme)}${row('Muziek', show.music)}${row('Kleding', show.costume)}${row('Regie', show.direction)}
       </table>
       <h2>Scènes</h2>
@@ -712,9 +661,7 @@ function printShow(show) {
       <h2>Toetscheck</h2>
       <ul class="doc-checks">
         <li>Duo’s met twee technieken: ${a.totals.pairs.join('/')}</li>
-        ${a.partners.length ? `<li>Met ${MIN_PARTNERS} groepsgenoten: ${a.totals.partners.join('/')}${a.partners.some(x => !x.ok) ? ` (nog niet: ${esc(a.partners.filter(x => !x.ok).map(x => memberName(show, x.m)).join(', '))})` : ''}</li>` : ''}
         <li>Sportprofielen: ${a.totals.sports.join('/')}${a.sports.some(x => !x.ok) ? ` (ontbreekt: ${esc(a.sports.filter(x => !x.ok).map(x => x.s.name).join(', '))})` : ''}</li>
-        <li>Valrichtingen: ${a.totals.directions.join('/')}${a.directions.some(x => !x.ok) ? ` (ontbreekt: ${esc(a.directions.filter(x => !x.ok).map(x => x.d.name.toLowerCase()).join(', '))})` : ''}</li>
         ${a.roles.map(x => {
           const miss = Object.entries(x.r).filter(([, v]) => !v).map(([k]) => roleWords[k]);
           return `<li>${esc(memberName(show, x.m))}: ${miss.length ? `nog niet: ${miss.join(', ')}` : 'laat alles zien'}</li>`;
@@ -744,15 +691,6 @@ const move = (list, idx, dir) => {
   if (idx < 0 || to < 0 || to >= list.length) return;
   [list[idx], list[to]] = [list[to], list[idx]];
 };
-// Nieuwe duo's achteraan zetten, steeds zo dat niemand twee scènes achter elkaar speelt (als dat kan)
-function appendSpread(scenes, pairs) {
-  const todo = [...pairs];
-  while (todo.length) {
-    const last = scenes.length ? scenes[scenes.length - 1].pair : null;
-    const i = Math.max(0, todo.findIndex(p => !last || !p.some(m => last.includes(m))));
-    scenes.push(newScene(todo.splice(i, 1)[0]));
-  }
-}
 
 Object.assign(actions, {
   noop: () => {},
@@ -842,43 +780,45 @@ Object.assign(actions, {
       .catch(e => { if (e && e.name !== 'AbortError') toast('Delen lukte niet. Kopieer de link.'); });
   }),
 
+  // Groep van vijf: er komen vier duo's bij (ieder met het vijfde groepslid)
+  'member-add': withShow(show => {
+    if (show.members.length >= 5) return;
+    const scene = pair => ({ id: uid(), pair: [...pair], title: '', note: '', items: [] });
+    const untouched = show.scenes.every(sc => sc.pair && !sc.items.length && !sc.title && !sc.note);
+    ui.setupOpen = true;
+    update(() => {
+      show.members.push('');
+      // Nog niets ingevuld: meteen de handigste volgorde. Anders de nieuwe duo's achteraan.
+      if (untouched) show.scenes = PAIRS5.map(scene);
+      else [0, 1, 2, 3].forEach(i => show.scenes.push(scene([i, 4])));
+      touch(show);
+    });
+    requestAnimationFrame(() => document.querySelector('[data-input="member"][data-i="4"]')?.focus());
+    toast('Vijfde groepslid toegevoegd: er zijn nu tien duo’s');
+  }),
+
+  'member-remove': withShow(async show => {
+    if (show.members.length < 5) return;
+    const mine = show.scenes.filter(sc => sc.pair && sc.pair.includes(4));
+    const filled = mine.filter(sc => sc.items.length || sc.title || sc.note).length;
+    if (filled) {
+      const ok = await confirmDialog(`${memberName(show, 4)} en ${filled} ingevulde ${filled === 1 ? 'scène' : 'scènes'} met dit groepslid worden verwijderd.`, { title: 'Groepslid verwijderen?' });
+      if (!ok) return;
+    }
+    if (ui.absent === 4) ui.absent = null;
+    ui.setupOpen = true;
+    update(() => {
+      show.scenes = show.scenes.filter(sc => !mine.includes(sc));
+      show.members.length = 4;
+      touch(show);
+    });
+  }),
+
   rehearse: withShow(show => openRehearsal(show)),
 
   'checks-open': withShow(() => {
     openDialog({ title: 'Toetscheck', body: '<div data-part="checks"></div>' });
     refreshParts();
-  }),
-
-  // Viertal of zestal. Een lege show krijgt de startindeling; anders blijven de scènes staan
-  // en komen alleen de duo's erbij die nodig zijn.
-  'group-size': withShow(async (show, el) => {
-    const size = Number(el.dataset.val);
-    const from = show.members.length;
-    if (size === from || !SIZES.includes(size)) return;
-    const blank = sc => !sc.items.length && !sc.title.trim() && !sc.note.trim();
-    if (size < from) {
-      const gone = show.scenes.filter(sc => sc.pair && sc.pair.some(m => m >= size));
-      if (show.members.slice(size).some(m => m.trim()) || gone.some(sc => !blank(sc))) {
-        const names = show.members.slice(size).map((m, i) => memberName(show, size + i)).join(' en ');
-        const ok = await confirmDialog(`${names} worden uit de show gehaald${gone.length ? `, samen met ${gone.length === 1 ? 'hun scène' : `hun ${gone.length} scènes`}` : ''}.`,
-          { title: 'Terug naar een viertal?', ok: 'Viertal maken' });
-        if (!ok) return;
-      }
-    }
-    ui.absent = null;
-    update(() => {
-      const kept = show.scenes.filter(sc => !sc.pair || sc.pair.every(m => m < size));
-      show.members = Array.from({ length: size }, (_, i) => show.members[i] || '');
-      if (kept.every(blank)) {
-        show.scenes = startPairs(size).map(newScene);
-      } else {
-        show.scenes = kept;
-        const have = new Set(kept.filter(sc => sc.pair).map(sc => pairKey(sc.pair)));
-        // Bij een zestal de startduo's van de nieuwe groepsleden, bij een viertal de ontbrekende duo's
-        appendSpread(show.scenes, startPairs(size).filter(p => !have.has(pairKey(p)) && (size === 4 || p.some(m => m >= from))));
-      }
-      touch(show);
-    });
   }),
 
   // Een weergavekeuze: niet opslaan, alleen opnieuw tekenen
@@ -888,17 +828,17 @@ Object.assign(actions, {
   },
 
   'scene-add': withShow(show => {
-    const options = allPairs(show.members.length);
     const d = openDialog({
       title: 'Scène toevoegen',
       className: 'dlg-small',
       body: `<div class="menu">
-        ${options.map((p, i) => `<button type="button" data-pair="${i}">${icon('users')} ${pairLabel(show, p)}</button>`).join('')}
+        ${pairsFor(show).map((p, i) => `<button type="button" data-pair="${i}">${icon('users')} ${pairLabel(show, p)}</button>`).join('')}
         <button type="button" data-pair="group">${icon('users')} Hele groep <small>opening, overgang of slot</small></button>
       </div>`,
     });
     d.querySelectorAll('[data-pair]').forEach(b => b.addEventListener('click', () => {
-      const sc = newScene(b.dataset.pair === 'group' ? null : options[Number(b.dataset.pair)]);
+      const pair = b.dataset.pair === 'group' ? null : [...pairsFor(show)[Number(b.dataset.pair)]];
+      const sc = { id: uid(), pair, title: '', note: '', items: [] };
       update(() => { show.scenes.push(sc); touch(show); });
       d.close();
       requestAnimationFrame(() => document.getElementById(`scene-${sc.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));

@@ -31,9 +31,7 @@ export function focusKey(el) {
 }
 export function restoreFocus(key) {
   if (!key || (document.activeElement && document.activeElement !== document.body && document.contains(document.activeElement))) return;
-  // Dezelfde knop kan twee keer bestaan (Toetscheck naast de show en in een venster): neem de zichtbare
-  const same = [...document.querySelectorAll('[data-action]')].filter(e => focusKey(e) === key);
-  const el = same.find(e => e.getClientRects().length) || same[0];
+  const el = [...document.querySelectorAll('[data-action]')].find(e => focusKey(e) === key);
   if (!el) return;
   // Een uitgeschakelde knop (bijvoorbeeld Omlaag bij het laatste item) kan geen focus krijgen: neem de buurknop
   const target = el.disabled ? el.parentElement.querySelector('[data-action]:not([disabled])') : el;
@@ -214,7 +212,7 @@ export function openVideo(url, title) {
     title,
     className: 'dlg-video',
     body: `${frame}
-      <a class="btn btn-ghost btn-block" href="${esc(url)}" target="_blank" rel="noopener">${icon('external')} Open op YouTube</a>`,
+      <a class="btn btn-ghost btn-block" href="${esc(url)}" target="_blank" rel="noopener">${icon('external')} ${id ? 'Open op YouTube' : 'Open het filmpje'}</a>`,
   });
 }
 
