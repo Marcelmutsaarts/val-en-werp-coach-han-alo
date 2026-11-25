@@ -6,6 +6,10 @@ import { icon, actions, inputs, refreshParts, focusKey, restoreFocus, confirmDia
 import { viewToets, viewValbreken, viewSporten, viewTechnieken } from './views.js';
 import { viewChoreo, autoGrow } from './choreo.js';
 
+// Alle modules zijn goed geladen: het herlaad-vangnet in index.html hoeft niet meer
+document.documentElement.dataset.started = '1';
+try { sessionStorage.removeItem('vwc-herladen'); } catch { /* geen opslag */ }
+
 const ROUTES = [
   { id: 'toets', label: 'Toets', view: viewToets },
   { id: 'valbreken', label: 'Valbreken', view: viewValbreken },

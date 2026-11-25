@@ -3,12 +3,29 @@ import { TECHNIQUES, SPORTS, LEVELS, DIRECTIONS } from './data.js';
 
 const KEY = 'val-werp-coach:v1';
 
+// Een groep heeft vier, vijf of zes leden.
+export const MIN_SIZE = 4;
+export const MAX_SIZE = 6;
+export const LETTERS = 'ABCDEF';
+
 // Volgorde van de zes duo's: binnen elk blok van twee zijn de duo's verschillend,
 // zodat niemand twee scènes direct na elkaar hoeft te spelen.
 export const PAIRS = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
 // Groep van vijf: tien duo's, zo geordend dat niemand twee scènes direct na elkaar speelt.
 export const PAIRS5 = [[0, 1], [2, 3], [0, 4], [1, 2], [3, 4], [0, 2], [1, 3], [2, 4], [0, 3], [1, 4]];
-export const pairsFor = show => (show.members.length >= 5 ? PAIRS5 : PAIRS);
+// Groep van zes: een startvoorstel van negen duo's in drie rondes. Ieder groepslid speelt één keer per ronde,
+// dus in drie duo's, en nooit twee scènes achter elkaar. De groep mag dit zelf aanpassen.
+const PAIRS6 = [[0, 3], [1, 4], [2, 5], [0, 4], [1, 5], [2, 3], [0, 5], [1, 3], [2, 4]];
+
+export const startPairs = size => (size >= 6 ? PAIRS6 : size === 5 ? PAIRS5 : PAIRS);
+// Bij vier en vijf zijn dit alle duo's, die de toets allemaal vraagt
+export const pairsFor = show => startPairs(show.members.length);
+export function allPairs(size) {
+  const out = [];
+  for (let a = 0; a < size; a++) for (let b = a + 1; b < size; b++) out.push([a, b]);
+  return out;
+}
+export const newScene = pair => ({ id: uid(), pair: pair ? [...pair] : null, title: '', note: '', items: [] });
 
 export const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
 
@@ -113,7 +130,7 @@ export function newShow(name = 'Mijn show') {
     music: '',
     costume: '',
     direction: '',
-    scenes: PAIRS.map(pair => ({ id: uid(), pair: [...pair], title: '', note: '', items: [] })),
+    scenes: PAIRS.map(newScene),
     updated: Date.now(),
   };
 }
@@ -124,7 +141,7 @@ export function activeShow() {
 
 export function memberName(show, i) {
   const n = (show.members[i] || '').trim();
-  return n || `Student ${'ABCDE'[i]}`;
+  return n || `Student ${LETTERS[i]}`;
 }
 
 // ---------- Validatie (ook voor geïmporteerde bestanden en deel-links) ----------
@@ -161,8 +178,8 @@ export function safeUrl(u) {
 export function sanitizeShow(s, { fresh = false } = {}) {
   if (!s || typeof s !== 'object') return null;
   const members = Array.isArray(s.members) ? s.members : [];
-  // Een groep heeft vier of vijf leden
-  const size = members.length >= 5 ? 5 : 4;
+  // Een groep heeft vier, vijf of zes leden
+  const size = Math.min(MAX_SIZE, Math.max(MIN_SIZE, members.length));
   const validPair = p => Array.isArray(p) && p.length === 2 && p.every(i => Number.isInteger(i) && i >= 0 && i < size) && p[0] !== p[1];
   const id = v => (!fresh && okId(v) ? v : uid());
   const scenes = (Array.isArray(s.scenes) ? s.scenes : []).slice(0, 40).filter(sc => sc && typeof sc === 'object').map(sc => {

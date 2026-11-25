@@ -1,6 +1,6 @@
 // Werkt ook met slechte wifi in de sporthal: eerst het netwerk, maar na 3 seconden de bewaarde versie.
 // Na een inhoudelijke update dit versienummer ophogen.
-const CACHE = 'val-werp-coach-v6';
+const CACHE = 'val-werp-coach-v7';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'app.js', 'ui.js', 'store.js', 'data.js', 'views.js', 'choreo.js',
   'icon.svg', 'icon-192.png', 'manifest.webmanifest',

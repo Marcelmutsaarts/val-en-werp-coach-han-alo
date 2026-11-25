@@ -31,7 +31,9 @@ export function focusKey(el) {
 }
 export function restoreFocus(key) {
   if (!key || (document.activeElement && document.activeElement !== document.body && document.contains(document.activeElement))) return;
-  const el = [...document.querySelectorAll('[data-action]')].find(e => focusKey(e) === key);
+  // Dezelfde knop kan twee keer bestaan (Toetscheck naast de show en in een venster): neem de zichtbare
+  const same = [...document.querySelectorAll('[data-action]')].filter(e => focusKey(e) === key);
+  const el = same.find(e => e.getClientRects().length) || same[0];
   if (!el) return;
   // Een uitgeschakelde knop (bijvoorbeeld Omlaag bij het laatste item) kan geen focus krijgen: neem de buurknop
   const target = el.disabled ? el.parentElement.querySelector('[data-action]:not([disabled])') : el;

@@ -137,8 +137,10 @@ export const TOETS = {
   title: 'Van staand naar de grond',
   intro: 'De afsluiting is een show, demonstratie of verhaallijn en geldt als summatieve toets. Je attitude tijdens de lessen telt mee. De demonstratie wordt als geheel beoordeeld: zonder aarzelen en op hoog tempo uitgevoerd.',
   uitvoering: 'Je voert de afsluiting uit in een viertal. Binnen het viertal vorm je zes verschillende tweetallen. Elk tweetal presenteert samen twee verschillende technieken die passen bij jullie thema.',
+  groep: 'Zijn jullie met vijf? Dan vorm je alle tien tweetallen. Zijn jullie met zes? Dan hoeven niet alle vijftien tweetallen langs te komen. Combineer wel veel met elkaar: ieder groepslid vormt duo’s met minstens drie verschillende groepsgenoten, en jullie variëren in valrichting, valhoogte en sportprofiel.',
   bevat: [
     'Minimaal één val- en één werpmoment uit elk sportprofiel.',
+    'Variatie in valrichting: voorwaarts, achterwaarts en zijwaarts.',
     'Showelementen zoals muziek, kleding en regie die passen bij het thema.',
     'Veiligheid, samenwerking en presentatie staan centraal.',
   ],

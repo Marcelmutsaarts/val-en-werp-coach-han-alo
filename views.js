@@ -21,10 +21,10 @@ export function viewToets() {
       <h1>${esc(TOETS.title)}</h1>
       <p class="lead">${esc(TOETS.intro)}</p>
       <ul class="facts">
-        <li><b>4</b><span>studenten per groep</span></li>
-        <li><b>6</b><span>duo’s per groep</span></li>
+        <li><b>4–6</b><span>studenten per groep</span></li>
         <li><b>2</b><span>technieken per duo</span></li>
         <li><b>6</b><span>sportprofielen in de show</span></li>
+        <li><b>3</b><span>valrichtingen in de show</span></li>
       </ul>
       <a class="btn btn-primary" href="#choreo">Werk aan je show ${icon('arrow')}</a>
     </header>
@@ -36,6 +36,7 @@ export function viewToets() {
         <div class="pairs-demo">
           ${pairs.map(p => `<span>${p}</span>`).join('')}
         </div>
+        <p>${esc(TOETS.groep)}</p>
         <h3>De uitvoering bevat</h3>
         <ul class="checks">${TOETS.bevat.map(b => `<li>${icon('check')}<span>${esc(b)}</span></li>`).join('')}</ul>
         <h3>Je laat zien</h3>
