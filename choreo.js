@@ -47,7 +47,9 @@ export function analyze(show, absent = null) {
     return { m, n, ok: n >= need };
   });
   const sports = SPORTS.map(s => ({ s, ok: used.some(x => x.t.sport === s.id) }));
+  // Valrichtingen tellen niet mee: alleen een tip voor een gevarieerde show
   const directions = DIRECTIONS.map(d => ({ d, ok: used.some(x => x.t.dir === d.id) }));
+  const varied = !used.length || directions.every(x => x.ok);
   const roles = members.map(m => {
     const r = { valLaag: false, valHoog: false, werpLaag: false, werpHoog: false };
     for (const { t, sc, it } of used) {
@@ -63,11 +65,10 @@ export function analyze(show, absent = null) {
   const score = (list, f = x => x.ok) => [list.filter(f).length, list.length];
   const roleCount = [roles.reduce((n, x) => n + Object.values(x.r).filter(Boolean).length, 0), roles.length * 4];
   return {
-    pairs, partners, sports, directions, roles, elements,
+    pairs, partners, sports, directions, varied, roles, elements,
     dropped: show.scenes.filter(out),
     totals: {
-      pairs: score(pairs), partners: score(partners), sports: score(sports), directions: score(directions),
-      roles: roleCount, elements: score(elements),
+      pairs: score(pairs), partners: score(partners), sports: score(sports), roles: roleCount, elements: score(elements),
     },
   };
 }
@@ -85,10 +86,7 @@ function checksBody(show) {
   let uitval = '';
   if (ui.absent != null) {
     const b = analyze(show, ui.absent);
-    const missing = [
-      ...b.sports.filter(x => !x.ok).map(x => x.s.name),
-      ...b.directions.filter(x => !x.ok).map(x => `${x.d.name.toLowerCase()} vallen`),
-    ];
+    const missing = b.sports.filter(x => !x.ok).map(x => x.s.name);
     const left = show.scenes.length - b.dropped.length;
     const gaps = b.roles.map(x => {
       const miss = Object.keys(ROLE_WORDS).filter(k => !x.r[k]).map(k => ROLE_WORDS[k]);
@@ -100,7 +98,7 @@ function checksBody(show) {
     }).filter(x => x.text);
     uitval = `<div class="uitval-result">
       <p>Zonder <b>${esc(memberName(show, ui.absent))}</b> vallen ${b.dropped.length} scènes weg en blijven er ${left} over.
-      ${missing.length ? `Dan ontbreekt: <b>${esc(missing.join(', '))}</b>.` : 'Alle sportprofielen en valrichtingen zitten er dan nog in.'}</p>
+      ${missing.length ? `Dan ontbreekt: <b>${esc(missing.join(', '))}</b>.` : 'Alle sportprofielen zitten er dan nog in.'}</p>
       ${gaps.length
         ? `<ul>${gaps.map(x => `<li><b>${esc(memberName(show, x.m))}</b> ${x.text}</li>`).join('')}</ul>`
         : `<p>Iedereen laat dan nog steeds laag en hoog vallen en werpen zien${six ? `, met minstens ${MIN_PARTNERS - 1} groepsgenoten` : ''}.</p>`}
@@ -123,10 +121,7 @@ function checksBody(show) {
     <section class="check-group">
       <h3>Alle sportprofielen ${frac(a.totals.sports)}</h3>
       ${marks(a.sports.map(x => ({ name: x.s.name, ok: x.ok })))}
-    </section>
-    <section class="check-group">
-      <h3>Alle valrichtingen ${frac(a.totals.directions)}</h3>
-      ${marks(a.directions.map(x => ({ name: x.d.name, ok: x.ok })))}
+      ${a.varied ? '' : `<p class="hint">Tip voor een gevarieerde show: probeer ook ${esc(a.directions.filter(x => !x.ok).map(x => x.d.name.toLowerCase()).join(' en '))} te vallen.</p>`}
     </section>
     <section class="check-group">
       <h3>Ieder laat alles zien ${frac(a.totals.roles)}</h3>
@@ -719,7 +714,6 @@ function printShow(show) {
         <li>Duo’s met twee technieken: ${a.totals.pairs.join('/')}</li>
         ${a.partners.length ? `<li>Met ${MIN_PARTNERS} groepsgenoten: ${a.totals.partners.join('/')}${a.partners.some(x => !x.ok) ? ` (nog niet: ${esc(a.partners.filter(x => !x.ok).map(x => memberName(show, x.m)).join(', '))})` : ''}</li>` : ''}
         <li>Sportprofielen: ${a.totals.sports.join('/')}${a.sports.some(x => !x.ok) ? ` (ontbreekt: ${esc(a.sports.filter(x => !x.ok).map(x => x.s.name).join(', '))})` : ''}</li>
-        <li>Valrichtingen: ${a.totals.directions.join('/')}${a.directions.some(x => !x.ok) ? ` (ontbreekt: ${esc(a.directions.filter(x => !x.ok).map(x => x.d.name.toLowerCase()).join(', '))})` : ''}</li>
         ${a.roles.map(x => {
           const miss = Object.entries(x.r).filter(([, v]) => !v).map(([k]) => roleWords[k]);
           return `<li>${esc(memberName(show, x.m))}: ${miss.length ? `nog niet: ${miss.join(', ')}` : 'laat alles zien'}</li>`;

@@ -24,7 +24,7 @@ export function viewToets() {
         <li><b>4–6</b><span>studenten per groep</span></li>
         <li><b>2</b><span>technieken per duo</span></li>
         <li><b>6</b><span>sportprofielen in de show</span></li>
-        <li><b>3</b><span>valrichtingen in de show</span></li>
+        <li><b>6–10</b><span>duo’s per groep</span></li>
       </ul>
       <a class="btn btn-primary" href="#choreo">Werk aan je show ${icon('arrow')}</a>
     </header>

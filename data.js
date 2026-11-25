@@ -140,7 +140,6 @@ export const TOETS = {
   groep: 'Zijn jullie met vijf? Dan vorm je alle tien tweetallen. Zijn jullie met zes? Dan hoeven niet alle vijftien tweetallen langs te komen. Combineer wel veel met elkaar: ieder groepslid vormt duo’s met minstens drie verschillende groepsgenoten, en jullie variëren in valrichting, valhoogte en sportprofiel.',
   bevat: [
     'Minimaal één val- en één werpmoment uit elk sportprofiel.',
-    'Variatie in valrichting: voorwaarts, achterwaarts en zijwaarts.',
     'Showelementen zoals muziek, kleding en regie die passen bij het thema.',
     'Veiligheid, samenwerking en presentatie staan centraal.',
   ],
