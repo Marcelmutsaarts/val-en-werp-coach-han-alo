@@ -3,12 +3,24 @@ import { TECHNIQUES, SPORTS, LEVELS, DIRECTIONS } from './data.js';
 
 const KEY = 'val-werp-coach:v1';
 
-// Volgorde van de zes duo's: binnen elk blok van twee zijn de duo's verschillend,
+// Een groep is een viertal of een zestal.
+export const SIZES = [4, 6];
+export const LETTERS = 'ABCDEF';
+
+// Volgorde van de zes duo's in een viertal: binnen elk blok van twee zijn de duo's verschillend,
 // zodat niemand twee scènes direct na elkaar hoeft te spelen.
 export const PAIRS = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
-// Groep van vijf: tien duo's, zo geordend dat niemand twee scènes direct na elkaar speelt.
-export const PAIRS5 = [[0, 1], [2, 3], [0, 4], [1, 2], [3, 4], [0, 2], [1, 3], [2, 4], [0, 3], [1, 4]];
-export const pairsFor = show => (show.members.length >= 5 ? PAIRS5 : PAIRS);
+// Startvoorstel voor een zestal: negen duo's in drie rondes. Ieder groepslid speelt één keer per ronde,
+// dus in drie duo's, en nooit twee scènes achter elkaar. De groep mag dit zelf aanpassen.
+const PAIRS_6 = [[0, 3], [1, 4], [2, 5], [0, 4], [1, 5], [2, 3], [0, 5], [1, 3], [2, 4]];
+
+export const startPairs = size => (size === 6 ? PAIRS_6 : PAIRS);
+export function allPairs(size) {
+  const out = [];
+  for (let a = 0; a < size; a++) for (let b = a + 1; b < size; b++) out.push([a, b]);
+  return out;
+}
+export const newScene = pair => ({ id: uid(), pair: pair ? [...pair] : null, title: '', note: '', items: [] });
 
 export const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
 
@@ -96,24 +108,22 @@ export function techById(id) {
   return TECHNIQUES.find(t => t.id === id) || state.custom.find(t => t.id === id) || null;
 }
 
-// Een eigen techniek hoeft niet bij een sportprofiel te horen; die telt dan voor geen enkel profiel mee.
-export const NO_SPORT = { id: 'nvt', name: 'Zelf bedacht', title: 'N.v.t. (zelf bedacht)' };
-export const sportById = id => SPORTS.find(s => s.id === id) || (id === NO_SPORT.id ? NO_SPORT : undefined);
+export const sportById = id => SPORTS.find(s => s.id === id);
 export const levelById = id => LEVELS.find(l => l.id === id) || LEVELS[0];
 export const dirById = id => DIRECTIONS.find(d => d.id === id) || DIRECTIONS[0];
 
 // ---------- Shows ----------
 
-export function newShow(name = 'Mijn show') {
+export function newShow(name = 'Mijn show', size = 4) {
   return {
     id: uid(),
     name,
-    members: ['', '', '', ''],
+    members: Array(size).fill(''),
     theme: '',
     music: '',
     costume: '',
     direction: '',
-    scenes: PAIRS.map(pair => ({ id: uid(), pair: [...pair], title: '', note: '', items: [] })),
+    scenes: startPairs(size).map(newScene),
     updated: Date.now(),
   };
 }
@@ -124,7 +134,7 @@ export function activeShow() {
 
 export function memberName(show, i) {
   const n = (show.members[i] || '').trim();
-  return n || `Student ${'ABCDE'[i]}`;
+  return n || `Student ${LETTERS[i]}`;
 }
 
 // ---------- Validatie (ook voor geïmporteerde bestanden en deel-links) ----------
@@ -139,7 +149,7 @@ export function sanitizeTechnique(t) {
   return {
     id: typeof t.id === 'string' && CUSTOM_RE.test(t.id) ? t.id : `c-${uid()}`,
     name,
-    sport: t.sport === NO_SPORT.id || SPORTS.some(s => s.id === t.sport) ? t.sport : SPORTS[0].id,
+    sport: SPORTS.some(s => s.id === t.sport) ? t.sport : SPORTS[0].id,
     dir: DIRECTIONS.some(d => d.id === t.dir) ? t.dir : DIRECTIONS[0].id,
     level,
     height: level === 'uitdagend' ? (t.height === 'laag' ? 'laag' : 'hoog') : level,
@@ -161,8 +171,7 @@ export function safeUrl(u) {
 export function sanitizeShow(s, { fresh = false } = {}) {
   if (!s || typeof s !== 'object') return null;
   const members = Array.isArray(s.members) ? s.members : [];
-  // Een groep heeft vier of vijf leden
-  const size = members.length >= 5 ? 5 : 4;
+  const size = members.length > 4 ? 6 : 4;
   const validPair = p => Array.isArray(p) && p.length === 2 && p.every(i => Number.isInteger(i) && i >= 0 && i < size) && p[0] !== p[1];
   const id = v => (!fresh && okId(v) ? v : uid());
   const scenes = (Array.isArray(s.scenes) ? s.scenes : []).slice(0, 40).filter(sc => sc && typeof sc === 'object').map(sc => {
